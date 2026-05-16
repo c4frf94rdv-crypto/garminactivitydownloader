@@ -1,0 +1,17 @@
+# Sensible Zugangsdaten (NIEMALS hochladen!)
+.env
+
+# Lokale Datenbanken und Downloads
+*.db
+garmin_activities/
+/garmin_activities.db
+
+# Python-Systemdateien und Caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# macOS Systemdateien
+.DS_Store
