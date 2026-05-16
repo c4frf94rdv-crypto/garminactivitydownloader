@@ -4,7 +4,7 @@ from garminconnect import Garmin
 from database import fit_downloader_db
 from pathvalidate import sanitize_filename
 
-load_dotenv("fit-downloader.env")
+load_dotenv()
 
 # Load Configuration from environment variables
 USER_EMAIL = os.getenv("USER_EMAIL")
