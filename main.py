@@ -13,10 +13,14 @@ DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR")
 DB_FILE = os.getenv("DB_FILE")
 LIMIT_ACTIVITIES = int(os.getenv("LIMIT_ACTIVITIES", "5"))
 SUBFOLDER_PER_ACTIVITYTYPE = os.getenv("SUBFOLDER_PER_ACTIVITYTYPE", "true").lower() == "true"
-MAX_ACTIVITIES_TO_DOWNLOAD=1000
 FILENAME_TEMPLATE = os.getenv("FILENAME_TEMPLATE", "{activityId}")
 
+# Hardcoded constants
+MAX_ACTIVITIES_TO_DOWNLOAD=1000             # Garmin Connect API allows to download max 1000 activities per request
+
+
 def init_garmin_client():
+    # Todo: Add exception handling for login failure
     client = Garmin(USER_EMAIL, USER_PASSWORD)
     client.login()
     return client
@@ -42,6 +46,7 @@ def generate_filename(activity) -> str:
     activity_type = act_type_dict.get("typeKey", "unknown")
     startTime = activity.get('startTimeLocal', '0000-00-00')
 
+    #Todo Add addtional placeholder for activityStartTime with time
     filename = FILENAME_TEMPLATE.format(activityId=activity['activityId'], 
                                         activityName=activity['activityName'], 
                                         activityStartTime=startTime[:10], 
@@ -84,6 +89,7 @@ def write_activity_to_file(download_dir, activity, fit_data, db):
     file_path = os.path.join(download_dir, filename)
 
     with open(file_path, "wb") as f:
+        #ToDo Expection handling for file writing
         f.write(fit_data)
         db.save_activity_to_db(activity['activityId'], activity['activityName'], activity['startTimeLocal'], file_path)
         print(f"Activity saved: {activity['activityName']} at {activity['startTimeLocal']}")
@@ -92,8 +98,10 @@ def main():
     print("Connecting to Garmin Connect...")
 
     try:
+        #Todo: Refactor garmin connect to new unit
         client = init_garmin_client()
         db = fit_downloader_db(DB_FILE)
+        #Todo: Enhance cleanup to correct DB-Entries after another filenname template hast been set
         db.cleanup_orphaned_entries()
         download_activities(client, db)
 
