@@ -1,8 +1,11 @@
 import os
+import io
+import zipfile
 from dotenv import load_dotenv
 from garminconnect import Garmin
 from database import fit_downloader_db
 from pathvalidate import sanitize_filename
+from garminservice import GarminService
 
 load_dotenv()
 
@@ -10,51 +13,58 @@ load_dotenv()
 USER_EMAIL = os.getenv("USER_EMAIL")
 USER_PASSWORD = os.getenv("USER_PASSWORD")
 DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR")
-DB_FILE = os.getenv("DB_FILE")
+DB_FILE = os.getenv("DB_FILE", "garmin_activities.db")
 LIMIT_ACTIVITIES = int(os.getenv("LIMIT_ACTIVITIES", "5"))
 SUBFOLDER_PER_ACTIVITYTYPE = os.getenv("SUBFOLDER_PER_ACTIVITYTYPE", "true").lower() == "true"
 FILENAME_TEMPLATE = os.getenv("FILENAME_TEMPLATE", "{activityId}")
-
+RENAME_EXISTING_FILES = os.getenv("RENAME_EXISTING_FILES", "false").lower() == "true"
+DOWNLOAD_FORMAT = os.getenv("DOWNLOAD_FORMAT", "fit").lower()  # Options: "fit", "tcx", "both"
+SUBFOLDER_PER_FORMAT = os.getenv("SUBFOLDER_PER_FORMAT", "false").lower() == "true"
+REORDER_EXISTIING_FILESTRUCTURE = os.getenv("REORDER_EXISTIING_FILESTRUCTURE", "false").lower() == "true"
 # Hardcoded constants
 MAX_ACTIVITIES_TO_DOWNLOAD=1000             # Garmin Connect API allows to download max 1000 activities per request
 
-
 def init_garmin_client():
-    # Todo: Add exception handling for login failure
-    client = Garmin(USER_EMAIL, USER_PASSWORD)
-    client.login()
-    return client
+    garmin_service = GarminService(USER_EMAIL, USER_PASSWORD)
+    garmin_service.login()
+    return garmin_service
 
 def init_download_dir():
     download_dir = os.path.join(os.getcwd(), DOWNLOAD_DIR)
     os.makedirs(download_dir, exist_ok=True)
     return download_dir
 
-def get_and_create_downloadpath_by_activitytype(activity):
+def get_downloadpath_by_activitytype(activity, filetype):
     download_dir = os.path.join(os.getcwd(), DOWNLOAD_DIR)
+
+    if SUBFOLDER_PER_FORMAT:
+        if filetype in ["fit"]:
+            download_dir = os.path.join(download_dir, "fit")
+        if filetype in ["tcx"]:
+            download_dir = os.path.join(download_dir, "tcx")
 
     if SUBFOLDER_PER_ACTIVITYTYPE:
         act_type_dict = activity.get("activityType", {})
         activity_type = act_type_dict.get("typeKey", "unknown")
         download_dir = os.path.join(download_dir, activity_type)
-    os.makedirs(download_dir, exist_ok=True)
     return download_dir
 
 def generate_filename(activity) -> str:
 
     act_type_dict = activity.get("activityType", {})
     activity_type = act_type_dict.get("typeKey", "unknown")
-    startTime = activity.get('startTimeLocal', '0000-00-00')
+    startdate_and_time = activity.get('startTimeLocal', '0000-00-00T00:00:00')[:19].replace(" ", "_").replace(":", "-")
+    startdate = activity.get(startdate_and_time, '0000-00-00')
 
-    #Todo Add addtional placeholder for activityStartTime with time
     filename = FILENAME_TEMPLATE.format(activityId=activity['activityId'], 
                                         activityName=activity['activityName'], 
-                                        activityStartTime=startTime[:10], 
+                                        activityStartDate=startdate[:10], 
+                                        activityStartDateTime=startdate_and_time,
                                         activityType=activity_type)
     filename = sanitize_filename(filename)
-    return f"{filename}.fit"
+    return filename
 
-def download_activities(client, db):
+def download_activities(garmin_service, db):
     print("Downloading activities...")
 
     total_downloaded = 0
@@ -62,16 +72,58 @@ def download_activities(client, db):
         blocksize = min(MAX_ACTIVITIES_TO_DOWNLOAD, LIMIT_ACTIVITIES - total_downloaded)
         if blocksize <= 0:
             break
-        activities = client.get_activities(total_downloaded, blocksize)
+        activities = garmin_service.get_activities(total_downloaded, blocksize)
         for activity in activities:
-            if db.is_activity_saved(activity['activityId']):
-                print(f" - {activity['activityName']} am {activity['startTimeLocal']} already downloaded, skipping.")
-                continue
-
-            fit_data = client.download_activity(activity['activityId'])
-            activity_type_dir = get_and_create_downloadpath_by_activitytype(activity)
-            write_activity_to_file(activity_type_dir, activity, fit_data, db)
+            activity_package = download_activity_by_id(garmin_service, db, activity['activityId'])
+            if activity_package:
+                write_activity_package_to_file(activity, activity_package, db)
         total_downloaded += len(activities)
+
+def download_activity_by_id(garmin_service, db, activity_id):
+    if DOWNLOAD_FORMAT not in ["fit", "tcx", "both"]:
+        print(f"Invalid DOWNLOAD_FORMAT: {DOWNLOAD_FORMAT}. Must be 'fit', 'tcx', or 'both'.")
+        return
+    
+    activites_package = {}
+    if DOWNLOAD_FORMAT in ["fit", "both"]:
+        raw_bytes = garmin_service.download_activity(activity_id, Garmin.ActivityDownloadFormat.ORIGINAL)
+        # unzip if the downloaded file is a zip (some activities have multiple files, e.g. fit and tcx, and are delivered as zip)
+        if raw_bytes.startswith(b'PK\x03\x04'): 
+            with zipfile.ZipFile(io.BytesIO(raw_bytes)) as z:
+                first_file = z.namelist()[0]
+                activites_package["fit"] = z.read(first_file)
+        else:
+            activites_package["fit"] = raw_bytes
+    if DOWNLOAD_FORMAT in ["tcx", "both"]:
+        activites_package["tcx"] = garmin_service.download_activity(activity_id, Garmin.ActivityDownloadFormat.TCX)
+
+    return activites_package
+
+def write_activity_package_to_file(activity, activites_package, db):
+    for filetype, data in activites_package.items():
+        download_dir = get_downloadpath_by_activitytype(activity, filetype)
+        filename = ensure_unique_filename(download_dir, generate_filename(activity) + f".{filetype}")
+        file_path = os.path.join(download_dir, filename)
+        if db.is_activity_saved(activity['activityId'], filetype):
+            print(f" - {activity['activityName']} / {filetype} at {activity['startTimeLocal']} already downloaded, skipping.")
+            continue
+        try:    
+            with open(file_path, "wb") as f:
+                f.write(data)
+                db.save_activity_to_db(activity['activityId'], 
+                                    filetype,
+                                    activity['activityName'], 
+                                    activity['startTimeLocal'], 
+                                    file_path,
+                                    activity.get("activityType", {}).get("typeKey", "unknown"),
+                                    activity.get("activityType", {}).get("typeId", 0),
+                                    activity.get("activityType", {}).get("parentTypeId", 0)),
+                print(f"Activity saved: {activity['activityName']} at {activity['startTimeLocal']} as {filetype}")
+
+        except Exception as e: 
+            print(f"Error saving activity {activity['activityName']} at {activity['startTimeLocal']} as {filetype}: {e}")
+            raise
+
 
 def ensure_unique_filename(download_dir, filename):
     base, ext = os.path.splitext(filename)
@@ -83,26 +135,80 @@ def ensure_unique_filename(download_dir, filename):
         counter += 1
 
     return unique_filename
+    
+def migrate_filename_template(db):
+    print("Migrating existing files to new filename template...")
+    rows = db.get_all_activities()
+    for row in rows:
+        activity_id, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id = row
+        activity = {
+            "activityId": activity_id,
+            "activityName": name,
+            "startTimeLocal": start_time,
+            "activityType": {
+                "typeKey": activity_type_key,
+                "typeId": activity_type_id,
+                "parentTypeId": activity_type_parent_id
+            }
+        }
+        new_filename = generate_filename(activity)
+        new_file_path = os.path.join(os.path.dirname(file_path), new_filename)
+        if file_path != new_file_path:
+            os.rename(file_path, new_file_path)
+            db.update_activity_file_path(activity_id, new_file_path)
+            print(f"Renamed {file_path} to {new_file_path}")
 
-def write_activity_to_file(download_dir, activity, fit_data, db):
-    filename = ensure_unique_filename(download_dir, generate_filename(activity))
-    file_path = os.path.join(download_dir, filename)
+def migrate_file_structure(db):
+    print("Migrating existing files to new file structure...")
+    rows = db.get_all_activities()
+    for row in rows:
+        activity_id, file_type, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id = row
+        activity = {
+            "activityId": activity_id,
+            "activityName": name,
+            "startTimeLocal": start_time,
+            "activityType": {
+                "typeKey": activity_type_key,
+                "typeId": activity_type_id,
+                "parentTypeId": activity_type_parent_id
+            }
+        }
+        new_download_dir = get_downloadpath_by_activitytype(activity, file_type)
+        new_file_path = os.path.join(new_download_dir, os.path.basename(file_path))
+        if file_path != new_file_path:
+            os.rename(file_path, new_file_path)
+            db.update_activity_file_path(activity_id, new_file_path, file_type)
+            print(f"Moved {file_path} to {new_file_path}")
+    remove_empty_folders(os.path.join(os.getcwd(), DOWNLOAD_DIR))
 
-    with open(file_path, "wb") as f:
-        #ToDo Expection handling for file writing
-        f.write(fit_data)
-        db.save_activity_to_db(activity['activityId'], activity['activityName'], activity['startTimeLocal'], file_path)
-        print(f"Activity saved: {activity['activityName']} at {activity['startTimeLocal']}")
+
+def remove_empty_folders(path_to_check):
+    while True:
+        folders_deleted_this_run = 0
+        for root, dirs, files in os.walk(path_to_check, topdown=False):
+            if root == path_to_check:
+                continue
+            try:
+                if not os.listdir(root):
+                    os.rmdir(root)
+                    folders_deleted_this_run += 1
+            except Exception:
+
+                pass
+        if folders_deleted_this_run == 0:
+            break
+            
 
 def main():
-    print("Connecting to Garmin Connect...")
-
     try:
-        #Todo: Refactor garmin connect to new unit
         client = init_garmin_client()
+        init_download_dir()
         db = fit_downloader_db(DB_FILE)
-        #Todo: Enhance cleanup to correct DB-Entries after another filenname template hast been set
         db.cleanup_orphaned_entries()
+        if RENAME_EXISTING_FILES:
+            migrate_filename_template(db)
+        if REORDER_EXISTIING_FILESTRUCTURE:
+            migrate_file_structure(db)
         download_activities(client, db)
 
     except Exception as e:
