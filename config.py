@@ -17,6 +17,23 @@ class GarminDownloaderConfig:
     reorder_existing_filestructure: bool
     max_activities_to_download: int = 1000  # Garmin Connect API allows to download max 1000 activities per request
 
+    def __repr__(self) -> str:
+        # Mask sensitive fields in output
+        return (f"GarminDownloaderConfig("
+                f"user_email='***', "
+                f"user_password='***', "
+                f"download_dir='{self.download_dir}', "
+                f"db_file='{self.db_file}', "
+                f"limit_activities={self.limit_activities}, "
+                f"subfolder_per_activitytype={self.subfolder_per_activitytype}, "
+                f"filename_template='{self.filename_template}', "
+                f"rename_existing_files={self.rename_existing_files}, "
+                f"download_format='{self.download_format}', "
+                f"subfolder_per_format={self.subfolder_per_format}, "
+                f"reorder_existing_filestructure={self.reorder_existing_filestructure}, "
+                f"max_activities_to_download={self.max_activities_to_download})"
+        )
+
     @classmethod
     def from_env(cls) -> tuple["GarminDownloaderConfig", list[str]]:
         load_dotenv()

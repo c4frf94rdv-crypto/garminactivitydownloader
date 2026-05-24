@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from pathlib import Path
+from contextlib import contextmanager
 
 class GarminDownloaderDB:
     def __init__(self, config):
@@ -110,5 +111,16 @@ class GarminDownloaderDB:
         :param filetype: The type of the file to update (e.g., 'fit', 'tcx').
         :return: True if the update was successful, False otherwise."""
         cursor = self.conn.cursor()
-        cursor.execute('UPDATE activities SET file_path = ?, file_type = ? WHERE activity_id = ? and file_type = ?', (new_file_path, filetype, activity_id, filetype))
+        cursor.execute('UPDATE activities SET file_path = ? WHERE activity_id = ? and file_type = ?', (new_file_path, activity_id, filetype))
         self.conn.commit()
+
+    @contextmanager
+    def transaction(self):
+        """A context manager for database transactions."""
+        try:
+            self.conn.execute("BEGIN")
+            yield
+            self.conn.commit()      # Success
+        except:
+            self.conn.rollback()    # Failure
+            raise

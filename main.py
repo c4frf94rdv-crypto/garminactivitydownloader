@@ -147,10 +147,11 @@ def migrate_filename_template(db, config):
         activity, filetype, file_path = row_to_activity(row, config)
         new_file_path = os.path.join(os.path.dirname(file_path),  generate_filename(activity, filetype, config))
         if file_path != new_file_path:
-            os.rename(file_path, new_file_path)
-            relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
-            db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
-            print(f"Renamed {file_path} to {new_file_path}")
+            with db.transaction():
+                os.rename(file_path, new_file_path)
+                relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
+                db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
+                print(f"Renamed {file_path} to {new_file_path}")
 
 def migrate_file_structure(db, config):
     """Migrates existing files to the new file structure based on activity type and format. This function retrieves all activities from the database, determines the new file path for each activity based on its type and format, and moves the file to the new location if it is not already there. After moving the file, it updates the file path in the database accordingly. Finally, it removes any empty folders left behind after the migration.
@@ -164,10 +165,11 @@ def migrate_file_structure(db, config):
         new_file_path = os.path.join(new_download_dir, os.path.basename(file_path))
         if file_path != new_file_path:
             os.makedirs(new_download_dir, exist_ok=True)
-            os.rename(file_path, new_file_path)
-            relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
-            db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
-            print(f"Moved {file_path} to {new_file_path}")
+            with db.transaction():
+                os.rename(file_path, new_file_path)
+                relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
+                db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
+                print(f"Moved {file_path} to {new_file_path}")
     remove_empty_folders(os.path.join(os.getcwd(), config.download_dir))
 
 
