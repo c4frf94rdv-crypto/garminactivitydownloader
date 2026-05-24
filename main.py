@@ -8,7 +8,7 @@ from garminservice import GarminService
 from config import GarminDownloaderConfig
 
 def init_garmin_client(config):
-    garmin_service = GarminService(config.user_email, config.user_password)
+    garmin_service = GarminService(config)
     garmin_service.login()
     return garmin_service
 

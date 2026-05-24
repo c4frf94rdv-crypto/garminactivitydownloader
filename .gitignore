@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+.garmin_tokens/
 
 # macOS Systemdateien
 .DS_Store

@@ -22,14 +22,6 @@ class GarminDownloaderConfig:
         load_dotenv()
         errors = []
 
-        user_email = os.getenv("USER_EMAIL")
-        if not user_email:
-            errors.append("USER_EMAIL is required")
-
-        user_password = os.getenv("USER_PASSWORD")
-        if not user_password:
-            errors.append("USER_PASSWORD is required")
-
         download_dir = os.getenv("DOWNLOAD_DIR")
         if not download_dir:
             errors.append("DOWNLOAD_DIR is required")
@@ -42,8 +34,8 @@ class GarminDownloaderConfig:
             return None, errors
 
         return cls(
-            user_email=user_email,
-            user_password=user_password,
+            user_email=os.getenv("USER_EMAIL"),
+            user_password=os.getenv("USER_PASSWORD"),
             download_dir=download_dir,
             db_file=os.getenv("DB_FILE", "garmin_activities.db"),
             limit_activities=int(os.getenv("LIMIT_ACTIVITIES", "5")),
