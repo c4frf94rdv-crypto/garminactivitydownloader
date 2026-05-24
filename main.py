@@ -3,7 +3,7 @@ import io
 import zipfile
 from dotenv import load_dotenv
 from garminconnect import Garmin
-from database import fit_downloader_db
+from database import GarminDownloaderDB
 from pathvalidate import sanitize_filename
 from garminservice import GarminService
 
@@ -213,8 +213,8 @@ def main():
             return
         client = init_garmin_client()
         init_download_dir()
-        db = fit_downloader_db(DOWNLOAD_DIR, DB_FILE)
-        db.cleanup_orphaned_entries(DOWNLOAD_DIR)
+        db = GarminDownloaderDB(DOWNLOAD_DIR, DB_FILE)
+        db.cleanup_orphaned_entries()
         if RENAME_EXISTING_FILES:
             migrate_filename_template(db)
         if REORDER_EXISTING_FILESTRUCTURE:
