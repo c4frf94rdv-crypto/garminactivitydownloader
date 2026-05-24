@@ -3,11 +3,12 @@ import os
 from pathlib import Path
 
 class GarminDownloaderDB:
-    def __init__(self, download_dir, db_file):
-        self.download_dir = download_dir
-        self.db_file = db_file
+    def __init__(self, config):
+        self.download_dir = config.download_dir
+        self.db_file = config.db_file
         self.conn = sqlite3.connect(self._get_db_file_path())
         self._init_db()
+        self.cleanup_orphaned_entries()
 
     def __enter__(self):
         return self
