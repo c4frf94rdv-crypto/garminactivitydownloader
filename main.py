@@ -11,6 +11,12 @@ from garminconnect.exceptions import GarminConnectAuthenticationError, GarminCon
 
 logger = logging.getLogger(__name__)
 
+class SafeDict(dict):
+    
+    def __missing__(self, key):
+        """Return a default value if the key is not found in the dictionary."""        
+        return "{ " + key + " }"
+
 def init_garmin_client(config):
     garmin_service = GarminService(config)
     garmin_service.login()
@@ -45,14 +51,16 @@ def generate_filename(activity, filetype, config) -> str:
     startdate_and_time = activity.get('startTimeLocal', '0000-00-00T00:00:00')[:19].replace(" ", "_").replace(":", "-")
     startdate = startdate_and_time[:10]
 
-    filename = config.filename_template.format(activityId=activity['activityId'], 
-                                               activityName=activity['activityName'], 
-                                               activityStartDate=startdate, 
-                                               activityStartDateTime=startdate_and_time,
-                                               activityType=activity_type)
+    data = {
+        "activityId": activity['activityId'],
+        "activityName": activity.get('activityName', 'Unnamed_Activity'),
+        "activityStartDate": startdate,
+        "activityStartDateTime": startdate_and_time,
+        "activityType": activity_type,
+    }
+    filename = config.filename_template.format_map(SafeDict(data))
     filename = sanitize_filename(filename)
-    filename = filename + f".{filetype}"
-    return filename
+    return f"{filename}.{filetype}"
 
 def download_activities(garmin_service, db, config):
     logger.info("Downloading activities...")
@@ -67,7 +75,7 @@ def download_activities(garmin_service, db, config):
         if len(activities) == 0:
             break
         for activity in activities:
-            activity['activityName'] = activity.get('activityName') or 'Unnamed Activity'
+            activity['activityName'] = activity.get('activityName') or 'Unnamed Activity'            
             already_downloaded = True
             if config.download_format in ["fit", "both"]:
                 already_downloaded = already_downloaded and db.is_activity_saved(activity['activityId'], "fit")
