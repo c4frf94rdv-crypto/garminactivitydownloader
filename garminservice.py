@@ -1,8 +1,13 @@
 import getpass
 import os
+import logging
 from garminconnect import Garmin
 from garminconnect.exceptions import GarminConnectAuthenticationError, GarminConnectConnectionError, GarminConnectTooManyRequestsError
+
+logger = logging.getLogger(__name__)
 class GarminService:
+
+
 
     def __init__(self, config):
         self.user_email = config.user_email
@@ -15,7 +20,7 @@ class GarminService:
         return os.path.exists('/.dockerenv') or os.path.exists('/.dockerinit')
 
     def interactive_login(self):
-        print("No credentials found — logging in interactively.")
+        logger.info("No credentials found — logging in interactively.")
         email = input("Enter your Garmin Connect email: ").strip()
         password = getpass.getpass("Enter your Garmin Connect password: ").strip()
         self._do_login(Garmin(email, password, prompt_mfa=self._get_mfa_code))
@@ -32,28 +37,42 @@ class GarminService:
         # First, try to login using saved tokens
         try:
             self._do_login(Garmin())
-            print("Logged in using saved tokens.")
+            logger.info("Logged in using saved tokens.")
             return
         except GarminConnectTooManyRequestsError:
-            print("Too many requests. Please wait before trying again.")
+            logger.error("Too many requests. Please wait before trying again.")
             raise
         except (GarminConnectAuthenticationError, GarminConnectConnectionError):
-            print("No valid tokens found — falling back to credential login.")
+            logger.info("No valid tokens found — falling back to credential login.")
 
         # If token-based login fails try to login using credentials
         if self.user_email and self.user_password:
-            self._do_login(Garmin(self.user_email, self.user_password, prompt_mfa=self._get_mfa_code))
-            print("Logged in using credentials.")
-            return
+            try:
+                self._do_login(Garmin(self.user_email, self.user_password, prompt_mfa=self._get_mfa_code))
+                logger.info("Logged in using credentials.")
+                return
+            except Exception as e:
+                self._handle_login_error(e)
             
         # If we're running in Docker, we won't be able to do interactive login, so we should fail if token-based login fails
         if self._is_running_in_docker():
-            print("Running in Docker and token-based login failed. Cannot perform interactive login. Exiting.")
+            logger.error("Running in Docker and token-based login failed. Cannot perform interactive login. Exiting.")
             raise RuntimeError("Cannot perform interactive login in Docker environment.")
         
         # If token-based login fails and we're not in Docker, try interactive login as a last resort
         self.interactive_login()
-        print("Successfully logged in to Garmin Connect.")
+        logger.info("Successfully logged in to Garmin Connect.")
+
+    def _handle_login_error(self, error):
+        if isinstance(error, GarminConnectTooManyRequestsError):
+            logger.error("Too many requests. Please wait before trying again.")
+        elif isinstance(error, GarminConnectAuthenticationError):
+            logger.error("Authentication failed. Please check your credentials and try again.")
+        elif isinstance(error, GarminConnectConnectionError):
+            logger.error("Connection error occurred while trying to log in to Garmin Connect.")
+        else:
+            logger.error("An unexpected error occurred during login.")
+        raise error
 
     def get_activities(self, start: int,limit: int = 1000):
         if self.client is None:
@@ -62,10 +81,10 @@ class GarminService:
             activities = self.client.get_activities(start, limit)
             return activities
         except GarminConnectConnectionError:
-            print("Connection error occurred while trying to fetch activities from Garmin Connect.")
+            logger.error("Connection error occurred while trying to fetch activities from Garmin Connect.")
             raise
         except GarminConnectTooManyRequestsError:
-            print("Too many requests. Please wait before trying again.")
+            logger.error("Too many requests. Please wait before trying again.")
             raise
 
     def download_activity(self, activity_id: str, dl_fmt: Garmin.ActivityDownloadFormat):
@@ -75,8 +94,8 @@ class GarminService:
             fit_data = self.client.download_activity(activity_id, dl_fmt)
             return fit_data
         except GarminConnectConnectionError:
-            print(f"Connection error occurred while trying to download activity {activity_id}.")
+            logger.error(f"Connection error occurred while trying to download activity {activity_id}.")
             raise
         except GarminConnectTooManyRequestsError:
-            print("Too many requests. Please wait before trying again.")
+            logger.error("Too many requests. Please wait before trying again.")
             raise

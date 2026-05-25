@@ -1,8 +1,10 @@
 import sqlite3
 import os
+import logging
 from pathlib import Path
-from contextlib import contextmanager
 
+
+logger = logging.getLogger(__name__)
 class GarminDownloaderDB:
     def __init__(self, config):
         self.download_dir = config.download_dir
@@ -51,11 +53,14 @@ class GarminDownloaderDB:
         :param activity_type_id: The ID of the activity type.
         :param activity_type_parent_id: The parent ID of the activity type."""
         cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO activities (activity_id, file_type, name, start_time, file_path, downloaded_at, activity_type_key, activity_type_id, activity_type_parent_id)
-            VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)
-        ''', (activity_id, filetype, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id))
-        self.conn.commit()
+        try:
+            cursor.execute('''
+                INSERT INTO activities (activity_id, file_type, name, start_time, file_path, downloaded_at, activity_type_key, activity_type_id, activity_type_parent_id)
+                VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?)
+            ''', (activity_id, filetype, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id))
+            self.conn.commit()
+        except sqlite3.IntegrityError:
+            logger.warning(f"Activity {activity_id} / {filetype} already exists in database, skipping insert.")
 
     def is_activity_saved(self, activity_id, filetype):
         """Checks if the activity with the given ID and file type is already saved in the database.
@@ -74,13 +79,17 @@ class GarminDownloaderDB:
         cursor.execute('SELECT activity_id, file_path, file_type FROM activities')
         entries = cursor.fetchall()
         already_seen_files = set()
+        deleted_count = 0
         for entry_id, file_path, file_type in entries:
             file_path = os.path.join(os.getcwd(), self.download_dir, file_path)
             if self._should_delete_entry(file_path, file_type, already_seen_files):
                 cursor.execute('DELETE FROM activities WHERE activity_id = ? and file_type = ?', (entry_id, file_type))
+                deleted_count += 1
+                logger.debug(f"Orphaned entry deleted: {file_path}")
             else:
                 already_seen_files.add((file_path, file_type))
         self.conn.commit()
+        logger.info(f"Cleanup completed: {deleted_count} orphaned entries removed.")
 
     def _should_delete_entry(self, file_path: str, filetype: str, already_seen_files: set) -> bool:
         """Determines whether a database entry should be deleted based on the existence of the file and whether it is a duplicate.
@@ -108,19 +117,7 @@ class GarminDownloaderDB:
         """Updates the file path for a specific activity and file type in the database.
         :param activity_id: The ID of the activity to update.
         :param new_file_path: The new file path to set for the activity.
-        :param filetype: The type of the file to update (e.g., 'fit', 'tcx').
-        :return: True if the update was successful, False otherwise."""
+        :param filetype: The type of the file to update (e.g., 'fit', 'tcx')."""
         cursor = self.conn.cursor()
         cursor.execute('UPDATE activities SET file_path = ? WHERE activity_id = ? and file_type = ?', (new_file_path, activity_id, filetype))
         self.conn.commit()
-
-    @contextmanager
-    def transaction(self):
-        """A context manager for database transactions."""
-        try:
-            self.conn.execute("BEGIN")
-            yield
-            self.conn.commit()      # Success
-        except:
-            self.conn.rollback()    # Failure
-            raise

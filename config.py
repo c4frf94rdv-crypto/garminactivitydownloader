@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 
 @dataclass
 class GarminDownloaderConfig:
-    user_email: str
-    user_password: str
     download_dir: str
     db_file: str
     limit_activities: int
@@ -15,6 +13,9 @@ class GarminDownloaderConfig:
     download_format: str
     subfolder_per_format: bool
     reorder_existing_filestructure: bool
+    # Optional fields that can be set via environment variables, but are not required
+    user_email: str | None = None
+    user_password: str | None = None
     max_activities_to_download: int = 1000  # Garmin Connect API allows to download max 1000 activities per request
 
     def __repr__(self) -> str:
@@ -47,6 +48,16 @@ class GarminDownloaderConfig:
         if download_format not in ["fit", "tcx", "both"]:
             errors.append(f"DOWNLOAD_FORMAT must be 'fit', 'tcx', or 'both', got '{download_format}'")
 
+        limit_activities_str = os.getenv("LIMIT_ACTIVITIES", "5")
+        limit_activities = 5
+        try:
+            limit_activities = int(limit_activities_str)
+            if limit_activities < 1:
+                errors.append(f"LIMIT_ACTIVITIES must be >= 1, got {limit_activities}")
+                limit_activities = 5
+        except ValueError:
+            errors.append(f"LIMIT_ACTIVITIES must be an integer, got '{limit_activities_str}'")
+
         if errors:
             return None, errors
 
@@ -55,7 +66,7 @@ class GarminDownloaderConfig:
             user_password=os.getenv("USER_PASSWORD"),
             download_dir=download_dir,
             db_file=os.getenv("DB_FILE", "garmin_activities.db"),
-            limit_activities=int(os.getenv("LIMIT_ACTIVITIES", "5")),
+            limit_activities=limit_activities,
             subfolder_per_activitytype=os.getenv("SUBFOLDER_PER_ACTIVITYTYPE", "true").lower() == "true",
             filename_template=os.getenv("FILENAME_TEMPLATE", "{activityId}"),
             rename_existing_files=os.getenv("RENAME_EXISTING_FILES", "false").lower() == "true",
