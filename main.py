@@ -15,7 +15,7 @@ class SafeDict(dict):
     
     def __missing__(self, key):
         """Return a default value if the key is not found in the dictionary."""        
-        return "{ " + key + " }"
+        return "{"+key +"}"
 
 def init_garmin_client(config):
     garmin_service = GarminService(config)
@@ -48,18 +48,29 @@ def generate_filename(activity, filetype, config) -> str:
 
     act_type_dict = activity.get("activityType", {})
     activity_type = act_type_dict.get("typeKey", "unknown")
-    startdate_and_time = activity.get('startTimeLocal', '0000-00-00T00:00:00')[:19].replace(" ", "_").replace(":", "-")
+    raw_start_time = activity.get('startTimeLocal') or '0000-00-00T00:00:00'
+    startdate_and_time = raw_start_time[:19].replace(" ", "_").replace(":", "-")
     startdate = startdate_and_time[:10]
+    activity_name_raw = activity.get('activityName', 'Unnamed') or 'Unnamed'
+    if activity_name_raw is None or str(activity_name_raw).strip() == "":
+        activity_name = "Unnamed"
+    else:
+        activity_name = str(activity_name_raw)
 
+    activityId = activity.get('activityId', '0')
+ 
     data = {
-        "activityId": activity['activityId'],
-        "activityName": activity.get('activityName', 'Unnamed_Activity'),
+        "activityId": activityId,
+        "activityName": activity_name,
         "activityStartDate": startdate,
         "activityStartDateTime": startdate_and_time,
         "activityType": activity_type,
     }
     filename = config.filename_template.format_map(SafeDict(data))
+    filename = filename[:240]
     filename = sanitize_filename(filename)
+    if not filename.strip():
+        filename = "_"
     return f"{filename}.{filetype}"
 
 def download_activities(garmin_service, db, config):

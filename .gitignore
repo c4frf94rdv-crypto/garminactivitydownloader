@@ -14,6 +14,7 @@ __pycache__/
 venv/
 .garmin_tokens/
 garmin_downloader.log
+.coverage
 
 # macOS Systemdateien
 .DS_Store

@@ -20,30 +20,51 @@ class GarminDownloaderDB:
         self.conn.close()
 
     def _get_db_file_path(self):
-        """Returns the full path to the SQLite database file."""
+        """
+        Returns the full path to the SQLite database file.
+        """
         return os.path.join(self.download_dir, self.db_file)
 
     def _init_db(self):
-        """Initializes the database by creating the activities table if it doesn't exist."""
+        """
+        Initializes the database by creating the activities table if it doesn't exist.
+        """
         cursor = self.conn.cursor()
+        # Create table activites if not exists
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS activities (
                 activity_id TEXT,
                 file_type TEXT,
-                name TEXT,
-                start_time TEXT,
-                file_path TEXT,
-                downloaded_at TEXT,
-                activity_type_key TEXT,
-                activity_type_id INTEGER,
-                activity_type_parent_id INTEGER,
                 PRIMARY KEY (activity_id, file_type)
             )
         ''')
+        
+        # List of columns in table activities
+        required_columns = {
+            "name": "TEXT",
+            "start_time": "TEXT",
+            "file_path": "TEXT",
+            "downloaded_at": "TEXT",
+            "activity_type_key": "TEXT",
+            "activity_type_id": "INTEGER",
+            "activity_type_parent_id": "INTEGER"
+        }
+
+        # Check table for exisiting columns
+        cursor.execute("PRAGMA table_info(activities)")
+        existing_columns = [row[1] for row in cursor.fetchall()]
+
+        # dynamicaly add columns if they dont exist
+        for col_name, col_type in required_columns.items():
+            if col_name not in existing_columns:
+                logger.debug(f"Adding missing column '{col_name}' to activities table.")
+                cursor.execute(f"ALTER TABLE activities ADD COLUMN {col_name} {col_type}")
+        
         self.conn.commit()
 
     def save_activity_to_db(self, activity_id, filetype, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id):
-        """Saves the activity information to the database.
+        """
+        Saves the activity information to the database.
         :param activity_id: The ID of the activity.
         :param filetype: The type of the file (e.g., 'fit', 'tcx').
         :param name: The name of the activity.
@@ -51,7 +72,8 @@ class GarminDownloaderDB:
         :param file_path: The relative file path where the activity file is stored.
         :param activity_type_key: The key of the activity type.
         :param activity_type_id: The ID of the activity type.
-        :param activity_type_parent_id: The parent ID of the activity type."""
+        :param activity_type_parent_id: The parent ID of the activity type.
+        """
         cursor = self.conn.cursor()
         try:
             cursor.execute('''
@@ -63,18 +85,22 @@ class GarminDownloaderDB:
             logger.warning(f"Activity {activity_id} / {filetype} already exists in database, skipping insert.")
 
     def is_activity_saved(self, activity_id, filetype):
-        """Checks if the activity with the given ID and file type is already saved in the database.
+        """
+        Checks if the activity with the given ID and file type is already saved in the database.
         :param activity_id: The ID of the activity to check.
         :param filetype: The type of the file to check.
-        :return: True if the activity is saved, False otherwise."""
+        :return: True if the activity is saved, False otherwise.
+        """
         cursor = self.conn.cursor()
         cursor.execute('SELECT activity_id FROM activities WHERE activity_id = ? AND file_type = ?', (activity_id, filetype))
         result = cursor.fetchone()
         return result is not None
 
     def cleanup_orphaned_entries(self):
-        """Cleans up database entries that reference files that no longer exist or are duplicates.
-        This method checks all entries in the database and deletes those that reference files that do not exist on disk or are duplicates of existing files."""
+        """
+        Cleans up database entries that reference files that no longer exist or are duplicates.
+        This method checks all entries in the database and deletes those that reference files that do not exist on disk or are duplicates of existing files.
+        """
         cursor = self.conn.cursor()
         cursor.execute('SELECT activity_id, file_path, file_type FROM activities')
         entries = cursor.fetchall()
@@ -92,11 +118,13 @@ class GarminDownloaderDB:
         logger.info(f"Cleanup completed: {deleted_count} orphaned entries removed.")
 
     def _should_delete_entry(self, file_path: str, filetype: str, already_seen_files: set) -> bool:
-        """Determines whether a database entry should be deleted based on the existence of the file and whether it is a duplicate.
+        """
+        Determines whether a database entry should be deleted based on the existence of the file and whether it is a duplicate.
         :param file_path: The full path to the file referenced by the database entry.
         :param filetype: The type of the file (e.g., 'fit', 'tcx').
         :param already_seen_files: A set of file paths and types that have already been seen during the cleanup process.
-        :return: True if the entry should be deleted, False otherwise."""
+        :return: True if the entry should be deleted, False otherwise.
+        """
         path_object = Path(file_path)
     
         if not path_object.exists():
@@ -106,18 +134,22 @@ class GarminDownloaderDB:
         return False
     
     def get_all_activities(self):
-        """Retrieves all activities from the database.
-        :return: A list of tuples containing activity information (activity_id, file_type, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id)."""
+        """
+        Retrieves all activities from the database.
+        :return: A list of tuples containing activity information (activity_id, file_type, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id).
+        """
         cursor = self.conn.cursor()
         cursor.execute('SELECT activity_id, file_type, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id FROM activities')
         activities = cursor.fetchall()
         return activities
     
     def update_activity_file_path(self, activity_id, new_file_path, filetype):
-        """Updates the file path for a specific activity and file type in the database.
+        """
+        Updates the file path for a specific activity and file type in the database.
         :param activity_id: The ID of the activity to update.
         :param new_file_path: The new file path to set for the activity.
-        :param filetype: The type of the file to update (e.g., 'fit', 'tcx')."""
+        :param filetype: The type of the file to update (e.g., 'fit', 'tcx').
+        """
         cursor = self.conn.cursor()
         cursor.execute('UPDATE activities SET file_path = ? WHERE activity_id = ? and file_type = ?', (new_file_path, activity_id, filetype))
         self.conn.commit()
