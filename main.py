@@ -231,6 +231,9 @@ def migrate_filename_template(db, config):
         activity, filetype, file_path = row_to_activity(row, config)
         new_file_path = os.path.join(os.path.dirname(file_path),  generate_filename(activity, filetype, config))
         if file_path != new_file_path:
+            if not os.path.exists(file_path):
+                logger.warning(f"File {file_path} could not be found on disk. Skipping migration for this entry.")
+                continue
             relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
             db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
             os.rename(file_path, new_file_path)
