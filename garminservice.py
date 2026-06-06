@@ -7,8 +7,6 @@ from garminconnect.exceptions import GarminConnectAuthenticationError, GarminCon
 logger = logging.getLogger(__name__)
 class GarminService:
 
-
-
     def __init__(self, config):
         self.user_email = config.user_email
         self.user_password = config.user_password

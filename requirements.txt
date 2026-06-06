@@ -1,3 +1,7 @@
 garminconnect
 python-dotenv
 pathvalidate
+pytest
+MagicMock
+pytest-mock
+pytest-cov
