@@ -24,6 +24,7 @@ garmin_downloader.log
 :memory:
 test.db
 mock.db
+/test_downloads/
 
 # macOS Systemdateien
 .DS_Store
