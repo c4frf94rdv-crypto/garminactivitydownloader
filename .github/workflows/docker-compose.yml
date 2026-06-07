@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  fit-downloader:
+  garminactivitydownloader:
     image: ghcr.io/c4frf94rdv-crypto/garminactivitydownloader:latest
-    container_name: fit-downloader
+    container_name: garminactivitydownloader
     restart: unless-stopped
     
     environment:
