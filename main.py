@@ -66,8 +66,6 @@ def main():
         rundownloader(config)
 
         if config.dockermode:
-            total_delay_seconds = config.downloadinterval
-
             while True:
                 _countdown_timer(config.downloadinterval)
                 try:
