@@ -31,22 +31,17 @@ def rundownloader(config):
         download_activities(client, db, config)
 
 def _countdown_timer(total_seconds):
-    remaining = total_seconds
-    
-    while remaining > 0:
-        hours, remainder = divmod(remaining, 3600)
-        minutes, seconds = divmod(remainder, 60)
+    remaining_minutes = total_seconds // 60
+    while remaining_minutes > 0:
+        hours, minutes = divmod(remaining_minutes, 60)
         
-        # Formatiert die Anzeige (z.B. "05h 14m 22s")
-        # Der Zusatz '\r' am Anfang sorgt dafür, dass der Cursor an den Zeilenanfang springt
-        # end="" verhindert, dass Python automatisch eine neue Zeile anfängt
-        sys.stdout.write(f"\rRunning in Docker mode. Next download in: {hours:02d}h {minutes:02d}m {seconds:02d}s ...")
+        sys.stdout.write(f"\rRunning in Docker mode. Next download in: {hours:02d}h {minutes:02d}m ...")
         sys.stdout.flush()
         
-        time.sleep(1)
-        remaining -= 1
+        time.sleep(60) # sleep for 60 seconds
+        remaining_minutes -= 1
         
-    # Wenn der Countdown abgelaufen ist, die Zeile sauber leeren
+    # clear line after countdown ends
     print("\r" + " " * 50 + "\r", end="")
 
 def main():
