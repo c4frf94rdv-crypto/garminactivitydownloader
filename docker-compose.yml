@@ -3,14 +3,9 @@ services:
     image: ghcr.io/c4frf94rdv-crypto/garminactivitydownloader:latest
     container_name: garminactivitydownloader
     restart: unless-stopped
-    
-    environment:
-      - TZ=Europe/Vienna
-      - PYTHONUNBUFFERED=1
-      - PYTHONDONTWRITEBYTECODE=1
-    
+    ports:
+      - "9000:9000"
     env_file:
       - .env
-
     volumes:
-      - ./data:/app/data
+      - /app/data:/app/data
