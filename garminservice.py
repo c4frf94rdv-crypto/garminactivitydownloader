@@ -13,10 +13,6 @@ class GarminService:
         self.token_directory = os.path.join(os.getcwd(), ".garmin_tokens")
         self.client = None
 
-    def _is_running_in_docker(self):
-        """Detects if the application is running inside a Docker container."""
-        return os.path.exists('/.dockerenv') or os.path.exists('/.dockerinit')
-
     def interactive_login(self):
         logger.info("No credentials found — logging in interactively.")
         email = input("Enter your Garmin Connect email: ").strip()
@@ -52,11 +48,6 @@ class GarminService:
             except Exception as e:
                 self._handle_login_error(e)
             
-        # If we're running in Docker, we won't be able to do interactive login, so we should fail if token-based login fails
-        if self._is_running_in_docker():
-            logger.error("Running in Docker and token-based login failed. Cannot perform interactive login. Exiting.")
-            raise RuntimeError("Cannot perform interactive login in Docker environment.")
-        
         # If token-based login fails and we're not in Docker, try interactive login as a last resort
         self.interactive_login()
         logger.info("Successfully logged in to Garmin Connect.")

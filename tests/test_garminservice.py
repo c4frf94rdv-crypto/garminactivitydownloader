@@ -20,19 +20,6 @@ def service(mock_config):
     """Initializes the GarminService with a mock config."""
     return GarminService(mock_config)
 
-def test_is_running_in_docker(service):
-    """
-    Tests the Docker detection logic by mocking file existence.
-    """
-    with patch("os.path.exists") as mock_exists:
-        # Simulate running inside Docker
-        mock_exists.side_effect = lambda p: p == '/.dockerenv'
-        assert service._is_running_in_docker() is True
-        
-        # Simulate running on a host machine
-        mock_exists.side_effect = lambda p: False
-        assert service._is_running_in_docker() is False
-
 @patch("garminservice.Garmin")
 def test_login_with_tokens_success(mock_garmin_class, service):
     """
@@ -119,31 +106,6 @@ def test_download_activity_success(service):
     
     assert data == b"binary_fit_data"
     service.client.download_activity.assert_called_with("123", "fit")
-
-def test_login_docker_failure(service):
-    """
-    Verifies that the service fails with a RuntimeError if all login attempts 
-    fail while running inside a Docker container.
-    """
-    # 1. Mock the Docker check to return True
-    with patch.object(service, '_is_running_in_docker', return_value=True):
-        # 2. Mock the Garmin class
-        with patch("garminservice.Garmin") as mock_garmin_class:
-            # Create a client mock where login() always fails
-            mock_client = MagicMock()
-            mock_client.login.side_effect = GarminConnectAuthenticationError()
-            mock_garmin_class.return_value = mock_client
-            
-            # 3. Simulate that credentials are NOT available or failed
-            # We set these to None so the code skips the credential login attempt
-            # or reaches the end of the login method.
-            service.user_email = None
-            service.user_password = None
-
-            # Now the code should fail the token login, skip credential login, 
-            # and hit the Docker check at the end.
-            with pytest.raises(RuntimeError, match="Cannot perform interactive login in Docker environment"):
-                service.login()
 
 @patch("garminservice.Garmin")
 @patch("garminservice.getpass.getpass")
