@@ -1,6 +1,7 @@
 import os
 import logging
 import time
+import sys
 from database import GarminDownloaderDB
 from garminservice import GarminService
 from config import GarminDownloaderConfig
@@ -29,6 +30,25 @@ def rundownloader(config):
             migrate_file_structure(db, config)
         download_activities(client, db, config)
 
+def _countdown_timer(total_seconds):
+    remaining = total_seconds
+    
+    while remaining > 0:
+        hours, remainder = divmod(remaining, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        # Formatiert die Anzeige (z.B. "05h 14m 22s")
+        # Der Zusatz '\r' am Anfang sorgt dafür, dass der Cursor an den Zeilenanfang springt
+        # end="" verhindert, dass Python automatisch eine neue Zeile anfängt
+        sys.stdout.write(f"\rRunning in Docker mode. Next download in: {hours:02d}h {minutes:02d}m {seconds:02d}s ...")
+        sys.stdout.flush()
+        
+        time.sleep(1)
+        remaining -= 1
+        
+    # Wenn der Countdown abgelaufen ist, die Zeile sauber leeren
+    print("\r" + " " * 50 + "\r", end="")
+
 def main():
     try:
         console_handler = logging.StreamHandler()
@@ -50,11 +70,15 @@ def main():
         # Run download at least once at startup
         rundownloader(config)
 
-        if  config.dockermode:
+        if config.dockermode:
+            total_delay_seconds = config.downloadinterval
+
             while True:
-                logger.info(f"Running in Docker mode. Sleeping for {config.downloadinterval} seconds between downloads.")
-                time.sleep(config.downloadinterval)
-                rundownloader(config)
+                _countdown_timer(config.downloadinterval)
+                try:
+                    rundownloader(config)
+                except Exception as e:
+                    print(f"Fehler im Download-Zyklus: {e}")
 
     except Exception as e:
         logger.error(f"Error: {e}")
