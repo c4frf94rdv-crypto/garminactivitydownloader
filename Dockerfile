@@ -1,17 +1,18 @@
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata \
+RUN apt-get update && apt-get install -y \
+    ttyd \
+    tmux \
+    bash \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
+RUN pip install -r requirements.txt
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+RUN chmod +x entrypoint.sh
 
-CMD ["python", "main.py"]
+EXPOSE 9000
+
+CMD ["./entrypoint.sh"]
