@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   garminactivitydownloader:
     image: ghcr.io/c4frf94rdv-crypto/garminactivitydownloader:latest
