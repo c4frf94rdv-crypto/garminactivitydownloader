@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  fit-downloader:
+    image: ghcr.io/c4frf94rdv-crypto/garminactivitydownloader:latest
+    container_name: fit-downloader
+    restart: unless-stopped
+    
+    environment:
+      - TZ=Europe/Vienna
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    
+    env_file:
+      - .env
+
+    volumes:
+      - ./data:/app/data

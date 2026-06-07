@@ -17,6 +17,8 @@ class GarminDownloaderConfig:
     user_email: str | None = None
     user_password: str | None = None
     max_activities_to_download: int = 1000  # Garmin Connect API allows to download max 1000 activities per request
+    dockermode: bool = True  # Default to True, assuming most users will run in Docker
+    downloadinterval: int = 86400  # Default to 24 hours in seconds
 
     def __repr__(self) -> str:
         # Mask sensitive fields in output
@@ -32,7 +34,9 @@ class GarminDownloaderConfig:
                 f"download_format='{self.download_format}', "
                 f"subfolder_per_format={self.subfolder_per_format}, "
                 f"reorder_existing_filestructure={self.reorder_existing_filestructure}, "
-                f"max_activities_to_download={self.max_activities_to_download})"
+                f"max_activities_to_download={self.max_activities_to_download}, "
+                f"dockermode={self.dockermode}, "
+                f"downloadinterval={self.downloadinterval}"
         )
 
     @classmethod
@@ -73,4 +77,6 @@ class GarminDownloaderConfig:
             download_format=download_format,
             subfolder_per_format=os.getenv("SUBFOLDER_PER_FORMAT", "false").lower() == "true",
             reorder_existing_filestructure=os.getenv("REORDER_EXISTING_FILESTRUCTURE", "false").lower() == "true",
+            dockermode=os.getenv("DOCKERMODE", "true").lower() == "true",
+            downloadinterval=int(os.getenv("DOWNLOADINTERVAL", "86400"))
         ),[]
