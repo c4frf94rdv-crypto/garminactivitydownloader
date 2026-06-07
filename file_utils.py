@@ -11,7 +11,7 @@ class SafeDict(dict):
         return "{"+key +"}"
 
 def get_downloadpath_by_activitytype(activity, filetype, config):
-    download_dir = os.path.join(os.getcwd(), config.download_dir)
+    download_dir = os.path.join(config.basedir, config.download_dir)
 
     if config.subfolder_per_format:
         # gpx files are downloaded for activities that don't have a fit file available via the API, but since gpx files are basically just a fallback for fit files, it makes more sense to put them in the same folder as the fit files instead of putting them in a separate folder based on format

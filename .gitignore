@@ -9,6 +9,7 @@ logs/
 *.db
 garmin_activities/
 /garmin_activities.db
+data/
 
 # Python-Systemdateien und Caches
 __pycache__/

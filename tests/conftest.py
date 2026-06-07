@@ -13,5 +13,5 @@ def mock_config():
         rename_existing_files=False,
         download_format="fit",
         subfolder_per_format=False,
-        reorder_existing_filestructure=False
+        reorder_existing_filestructure=False,
     )

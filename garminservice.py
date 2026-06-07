@@ -10,7 +10,7 @@ class GarminService:
     def __init__(self, config):
         self.user_email = config.user_email
         self.user_password = config.user_password
-        self.token_directory = os.path.join(os.getcwd(), ".garmin_tokens")
+        self.token_directory = os.path.join(config.basedir, ".garmin_tokens")
         self.client = None
 
     def interactive_login(self):

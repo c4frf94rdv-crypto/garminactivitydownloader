@@ -1,8 +1,8 @@
 import os
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call
 from migration import migrate_filename_template, migrate_file_structure
 
-def test_migrate_file_structure_reorder(mock_config, mocker, tmp_path):
+def test_migrate_file_structure_reorder(mock_config, tmp_path):
     db = MagicMock()
     old_rel_path = os.path.join("running", "activity.fit")
     db.get_all_activities.return_value = [
@@ -12,6 +12,7 @@ def test_migrate_file_structure_reorder(mock_config, mocker, tmp_path):
     mock_config.download_dir = str(tmp_path)
     mock_config.subfolder_per_format = True
     mock_config.subfolder_per_activitytype = True
+    mock_config.basedir = str(tmp_path)
     
     old_full_dir = tmp_path / "running"
     old_full_dir.mkdir(parents=True, exist_ok=True)

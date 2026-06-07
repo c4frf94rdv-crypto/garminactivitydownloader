@@ -9,6 +9,7 @@ class GarminDownloaderDB:
     def __init__(self, config):
         self.download_dir = config.download_dir
         self.db_file = config.db_file
+        self.basedir = config.basedir
         self.conn = sqlite3.connect(self._get_db_file_path())
         self._init_db()
         self.cleanup_orphaned_entries()
@@ -23,7 +24,7 @@ class GarminDownloaderDB:
         """
         Returns the full path to the SQLite database file.
         """
-        return os.path.join(self.download_dir, self.db_file)
+        return os.path.join(self.basedir, self.download_dir, self.db_file)
 
     def _init_db(self):
         """
@@ -107,7 +108,7 @@ class GarminDownloaderDB:
         already_seen_files = set()
         deleted_count = 0
         for entry_id, file_path, file_type in entries:
-            file_path = os.path.join(os.getcwd(), self.download_dir, file_path)
+            file_path = os.path.join(self.basedir, self.download_dir, file_path)
             if self._should_delete_entry(file_path, file_type, already_seen_files):
                 cursor.execute('DELETE FROM activities WHERE activity_id = ? and file_type = ?', (entry_id, file_type))
                 deleted_count += 1

@@ -16,7 +16,7 @@ def init_garmin_client(config):
     return garmin_service
 
 def init_download_dir(config):
-    download_dir = os.path.join(os.getcwd(), config.download_dir)
+    download_dir = os.path.join(config.basedir, config.download_dir)
     os.makedirs(download_dir, exist_ok=True)
     return download_dir
 
@@ -48,7 +48,7 @@ def main():
     try:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
-        file_handler = logging.FileHandler("garmin_downloader.log")
+        file_handler = logging.FileHandler("data/garmin_downloader.log")
         file_handler.setLevel(logging.DEBUG)
         logging.basicConfig(
             level=logging.DEBUG,

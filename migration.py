@@ -17,7 +17,7 @@ def migrate_filename_template(db, config):
             if not os.path.exists(file_path):
                 logger.warning(f"File {file_path} could not be found on disk. Skipping migration for this entry.")
                 continue
-            relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
+            relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir))
             db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
             os.rename(file_path, new_file_path)
             logger.debug(f"Renamed {file_path} to {new_file_path}")
@@ -37,13 +37,13 @@ def migrate_file_structure(db, config):
         new_file_path = os.path.join(new_download_dir, os.path.basename(file_path))
         if file_path != new_file_path:
             os.makedirs(new_download_dir, exist_ok=True)
-            relative_new_path = os.path.relpath(new_file_path, os.path.join(os.getcwd(), config.download_dir))
+            relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir))
             db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
             os.rename(file_path, new_file_path)
             logger.debug(f"Moved {file_path} to {new_file_path}")
             filesMoved += 1
     logger.info(f"{filesMoved} activities moved -> see log for more information")
-    remove_empty_folders(os.path.join(os.getcwd(), config.download_dir))
+    remove_empty_folders(os.path.join(config.basedir, config.download_dir))
 
 def row_to_activity(row, config):
     activity_id, filetype, name, start_time, file_path, activity_type_key, activity_type_id, activity_type_parent_id = row
@@ -57,5 +57,5 @@ def row_to_activity(row, config):
             "parentTypeId": activity_type_parent_id
         }
     }
-    file_path = os.path.join(os.getcwd(), config.download_dir, file_path)
+    file_path = os.path.join(config.basedir, config.download_dir, file_path)
     return activity, filetype, file_path   

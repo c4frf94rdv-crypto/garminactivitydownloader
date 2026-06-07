@@ -5,9 +5,10 @@ from database import GarminDownloaderDB
 
 # Helper class for configuration (mock object)
 class MockConfig:
-    def __init__(self, download_dir=".", db_file=":memory:"):
+    def __init__(self, download_dir=".", db_file=":memory:", basedir = "."):
         self.download_dir = download_dir
         self.db_file = db_file
+        self.basedir = basedir
 
 @pytest.fixture
 def db():
@@ -109,6 +110,7 @@ def test_save_to_readonly_db(tmp_path):
     class Config:
         download_dir = str(tmp_path)
         db_file = "readonly.db"
+        basedir = str(tmp_path)
 
     # This should raise a sqlite3.OperationalError during init or write
     with pytest.raises(sqlite3.OperationalError):
@@ -188,6 +190,7 @@ def test_init_db_with_incompatible_schema(tmp_path):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "corrupt.db"
+        basedir = str(tmp_path)
     
     with GarminDownloaderDB(MockConfig()) as db:
         # 2. Saving must NOT raise an error anymore
@@ -212,6 +215,7 @@ def test_init_db_migration_works(tmp_path):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "migration_test.db"
+        basedir = str(tmp_path)
     
     # This should NOT crash anymore
     with GarminDownloaderDB(MockConfig()) as db:
@@ -229,6 +233,7 @@ def test_database_connection_closure(tmp_path):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "test.db"
+        basedir = str(tmp_path)
         
     with GarminDownloaderDB(MockConfig()) as db:
         conn = db.conn
@@ -247,6 +252,7 @@ def test_should_delete_entry_duplicate_path(tmp_path):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "test.db"
+        basedir = str(tmp_path)
 
     with GarminDownloaderDB(MockConfig()) as db:
         # 2. Create a real temporary file so that the first check
@@ -273,6 +279,7 @@ def test_should_delete_entry_first_time_seen(tmp_path):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "test.db"
+        basedir = str(tmp_path)
 
     with GarminDownloaderDB(MockConfig()) as db:
         test_file = tmp_path / "unique_activity.fit"
@@ -292,6 +299,7 @@ def test_database_locked(tmp_path, mocker):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "locked.db"
+        basedir = str(tmp_path)
 
     with GarminDownloaderDB(MockConfig()) as db:
         # We do not patch the connection, but the method of your class.
@@ -339,6 +347,7 @@ def test_partial_migration(tmp_path):
     class MockConfig:
         download_dir = str(tmp_path)
         db_file = "partial.db"
+        basedir = str(tmp_path)
 
     with GarminDownloaderDB(MockConfig()) as db:
         cursor = db.conn.cursor()

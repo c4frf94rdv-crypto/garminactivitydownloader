@@ -19,6 +19,7 @@ class GarminDownloaderConfig:
     max_activities_to_download: int = 1000  # Garmin Connect API allows to download max 1000 activities per request
     dockermode: bool = True  # Default to True, assuming most users will run in Docker
     downloadinterval: int = 86400  # Default to 24 hours in seconds
+    basedir = os.path.join(os.getcwd(), "data")
 
     def __repr__(self) -> str:
         # Mask sensitive fields in output
@@ -37,6 +38,7 @@ class GarminDownloaderConfig:
                 f"max_activities_to_download={self.max_activities_to_download}, "
                 f"dockermode={self.dockermode}, "
                 f"downloadinterval={self.downloadinterval}"
+                f"basedir={self.basedir}"
         )
 
     @classmethod
