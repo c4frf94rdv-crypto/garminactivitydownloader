@@ -1,31 +1,43 @@
-# Sensible Zugangsdaten (NIEMALS hochladen!)
+# Version control
+.git/
+.gitignore
+
+# Credentials & config not needed in image
 .env
+.env.example
+docker-compose.yml
+Dockerfile
+.dockerignore
 
-# Log
-logs/
-*.log
-
-# Lokale Datenbanken und Downloads
-*.db
+# Runtime data — managed via volume mount, not baked into image
+data/
 garmin_activities/
-/garmin_activities.db
-
-# Python-Systemdateien und Caches
-__pycache__/
-*.pyc
-.pytest_cache/
-.venv/
-venv/
 .garmin_tokens/
-garmin_downloader.log
-.coverage
 
-# Test- und Debugging-Dateien
+# Logs & databases
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Tests — not needed at runtime
+tests/
+.pytest_cache/
+.coverage
 :memory:
 test.db
 mock.db
-/tests
 /test_downloads/
 
-# macOS Systemdateien
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE & OS
+.vscode/
 .DS_Store
+
+# Docs
+*.md

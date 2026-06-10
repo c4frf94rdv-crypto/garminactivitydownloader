@@ -1,31 +1,30 @@
-# Sensible Zugangsdaten (NIEMALS hochladen!)
+# Credentials — never commit!
 .env
 
-# Log
-logs/
-*.log
-
-# Lokale Datenbanken und Downloads
-*.db
-garmin_activities/
-/garmin_activities.db
+# Runtime data
 data/
-
-# Python-Systemdateien und Caches
-__pycache__/
-*.pyc
-.pytest_cache/
-.venv/
-venv/
+garmin_activities/
 .garmin_tokens/
-garmin_downloader.log
-.coverage
 
-# Test- und Debugging-Dateien
+# Logs & databases
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Test artifacts
+.pytest_cache/
+.coverage
 :memory:
 test.db
 mock.db
 /test_downloads/
 
-# macOS Systemdateien
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# macOS
 .DS_Store
