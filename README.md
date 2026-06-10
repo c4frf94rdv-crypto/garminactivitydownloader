@@ -101,6 +101,22 @@ Example: `FILENAME_TEMPLATE="{activityStartDateTime}_{activityName}"` produces `
 |---|---|---|
 | `SUBFOLDER_PER_FORMAT` | `false` | Create subfolders per format (`fit/`, `tcx/`) |
 | `SUBFOLDER_PER_ACTIVITYTYPE` | `true` | Create subfolders per activity type (`running/`, `cycling/`) |
+| `USE_PARENT_ACTIVITY_TYPE` | `false` | Group sub-types under their parent type (see below) |
+
+#### USE_PARENT_ACTIVITY_TYPE
+
+Garmin distinguishes between specific sub-types (e.g. `trail_running`, `treadmill_running`, `street_running`) and the top-level parent type (`running`). By default, each sub-type gets its own subfolder and its own value in the `{activityType}` filename placeholder.
+
+When `USE_PARENT_ACTIVITY_TYPE=true`, all sub-types are mapped to their parent type instead. Examples:
+
+| Garmin activity type | Folder / `{activityType}` value |
+|---|---|
+| `trail_running` | `running` |
+| `treadmill_running` | `running` |
+| `indoor_cycling` | `cycling` |
+| `lap_swimming` | `swimming` |
+
+This setting affects both subfolder names (when `SUBFOLDER_PER_ACTIVITYTYPE=true`) and the `{activityType}` placeholder in `FILENAME_TEMPLATE`.
 
 With both enabled and `DOWNLOAD_FORMAT=both`, files are organized like this:
 

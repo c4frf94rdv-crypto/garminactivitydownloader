@@ -4,6 +4,38 @@ from pathvalidate import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
+# Maps Garmin parentTypeId to the corresponding top-level typeKey.
+# Used when USE_PARENT_ACTIVITY_TYPE is enabled to group sub-types under their parent.
+# IDs verified against the Garmin Connect API (/activity-service/activity/activityTypes).
+_PARENT_TYPE_ID_TO_KEY = {
+    1: "running",
+    2: "cycling",
+    3: "hiking",
+    4: "other",
+    9: "walking",
+    26: "swimming",
+    29: "fitness_equipment",
+    89: "multi_sport",
+    108: "steps",
+    144: "diving",
+    157: "safety",
+    165: "winter_sports",
+    199: "para_sports",
+    206: "team_sports",
+    219: "racket_sports",
+    228: "water_sports",
+}
+
+def resolve_activity_type_key(activity, config) -> str:
+    act_type_dict = activity.get("activityType", {})
+    type_key = act_type_dict.get("typeKey", "unknown")
+    if config.use_parent_activity_type:
+        parent_type_id = act_type_dict.get("parentTypeId")
+        if parent_type_id is not None:
+            return _PARENT_TYPE_ID_TO_KEY.get(parent_type_id, type_key)
+    return type_key
+
+
 class SafeDict(dict):
     
     def __missing__(self, key):
@@ -21,8 +53,7 @@ def get_downloadpath_by_activitytype(activity, filetype, config):
             download_dir = os.path.join(download_dir, "tcx")
 
     if config.subfolder_per_activitytype:
-        act_type_dict = activity.get("activityType", {})
-        activity_type = act_type_dict.get("typeKey", "unknown")
+        activity_type = resolve_activity_type_key(activity, config)
         download_dir = os.path.join(download_dir, activity_type)
     os.makedirs(download_dir, exist_ok=True)
     return download_dir
@@ -30,8 +61,7 @@ def get_downloadpath_by_activitytype(activity, filetype, config):
 
 def generate_filename(activity, filetype, config) -> str:
 
-    act_type_dict = activity.get("activityType", {})
-    activity_type = act_type_dict.get("typeKey", "unknown")
+    activity_type = resolve_activity_type_key(activity, config)
     raw_start_time = activity.get('startTimeLocal') or '0000-00-00T00:00:00'
     startdate_and_time = raw_start_time[:19].replace(" ", "_").replace(":", "-")
     startdate = startdate_and_time[:10]

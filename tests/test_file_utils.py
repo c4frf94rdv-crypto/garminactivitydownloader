@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import pytest
-from file_utils import SafeDict, ensure_unique_filename, get_downloadpath_by_activitytype, generate_filename
+from file_utils import SafeDict, ensure_unique_filename, get_downloadpath_by_activitytype, generate_filename, resolve_activity_type_key
 
 def test_safe_dict_missing_key():
     """Verify SafeDict returns {key} for missing keys."""
@@ -188,3 +188,102 @@ def test_generate_filename_all_cases(mock_config, activity_input, expected):
     else:
         result = generate_filename(activity, "fit", mock_config)
         assert result == expected
+
+
+# --- Tests for resolve_activity_type_key and USE_PARENT_ACTIVITY_TYPE ---
+
+@pytest.mark.parametrize("parent_type_id, expected_key", [
+    (1, "running"),
+    (2, "cycling"),
+    (3, "hiking"),
+    (4, "other"),
+    (9, "walking"),
+    (26, "swimming"),
+    (29, "fitness_equipment"),
+    (89, "multi_sport"),
+    (144, "diving"),
+    (165, "winter_sports"),
+    (206, "team_sports"),
+    (219, "racket_sports"),
+    (228, "water_sports"),
+])
+def test_resolve_activity_type_key_returns_parent_for_known_ids(mock_config, parent_type_id, expected_key):
+    mock_config.use_parent_activity_type = True
+    activity = {"activityType": {"typeKey": "trail_running", "typeId": 25, "parentTypeId": parent_type_id}}
+    assert resolve_activity_type_key(activity, mock_config) == expected_key
+
+
+def test_resolve_activity_type_key_falls_back_to_typekey_for_unknown_parent(mock_config):
+    mock_config.use_parent_activity_type = True
+    activity = {"activityType": {"typeKey": "some_exotic_type", "typeId": 999, "parentTypeId": 9999}}
+    assert resolve_activity_type_key(activity, mock_config) == "some_exotic_type"
+
+
+def test_resolve_activity_type_key_disabled_returns_specific_type(mock_config):
+    mock_config.use_parent_activity_type = False
+    activity = {"activityType": {"typeKey": "trail_running", "typeId": 25, "parentTypeId": 1}}
+    assert resolve_activity_type_key(activity, mock_config) == "trail_running"
+
+
+def test_resolve_activity_type_key_parent_is_same_as_type(mock_config):
+    mock_config.use_parent_activity_type = True
+    activity = {"activityType": {"typeKey": "running", "typeId": 1, "parentTypeId": 1}}
+    assert resolve_activity_type_key(activity, mock_config) == "running"
+
+
+def test_resolve_activity_type_key_missing_parent_type_id(mock_config):
+    mock_config.use_parent_activity_type = True
+    activity = {"activityType": {"typeKey": "trail_running"}}
+    assert resolve_activity_type_key(activity, mock_config) == "trail_running"
+
+
+def test_resolve_activity_type_key_missing_activity_type(mock_config):
+    mock_config.use_parent_activity_type = True
+    activity = {}
+    assert resolve_activity_type_key(activity, mock_config) == "unknown"
+
+
+def test_get_downloadpath_uses_parent_type_for_subfolder(mock_config, tmp_path):
+    mock_config.subfolder_per_activitytype = True
+    mock_config.subfolder_per_format = False
+    mock_config.use_parent_activity_type = True
+    mock_config.basedir = str(tmp_path)
+
+    activity = {"activityType": {"typeKey": "trail_running", "typeId": 25, "parentTypeId": 1}}
+    path = get_downloadpath_by_activitytype(activity, "fit", mock_config)
+    assert os.path.basename(path) == "running"
+
+
+def test_get_downloadpath_uses_specific_type_when_disabled(mock_config, tmp_path):
+    mock_config.subfolder_per_activitytype = True
+    mock_config.subfolder_per_format = False
+    mock_config.use_parent_activity_type = False
+    mock_config.basedir = str(tmp_path)
+
+    activity = {"activityType": {"typeKey": "trail_running", "typeId": 25, "parentTypeId": 1}}
+    path = get_downloadpath_by_activitytype(activity, "fit", mock_config)
+    assert os.path.basename(path) == "trail_running"
+
+
+def test_generate_filename_uses_parent_type_in_template(mock_config):
+    mock_config.use_parent_activity_type = True
+    mock_config.filename_template = "{activityStartDate}_{activityType}"
+    activity = {
+        "activityId": "1",
+        "activityName": "Run",
+        "startTimeLocal": "2026-06-10 07:00:00",
+        "activityType": {"typeKey": "trail_running", "typeId": 25, "parentTypeId": 1},
+    }
+    assert generate_filename(activity, "fit", mock_config) == "2026-06-10_running.fit"
+
+
+def test_generate_filename_uses_specific_type_in_template_when_disabled(mock_config):
+    mock_config.use_parent_activity_type = False
+    mock_config.filename_template = "{activityStartDate}_{activityType}"
+    activity = {
+        "activityId": "1",
+        "activityName": "Run",
+        "startTimeLocal": "2026-06-10 07:00:00",
+        "activityType": {"typeKey": "trail_running", "typeId": 25, "parentTypeId": 1},
+    }
+    assert generate_filename(activity, "fit", mock_config) == "2026-06-10_trail_running.fit"

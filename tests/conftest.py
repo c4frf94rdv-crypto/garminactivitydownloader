@@ -14,4 +14,5 @@ def mock_config():
         download_format="fit",
         subfolder_per_format=False,
         reorder_existing_filestructure=False,
+        use_parent_activity_type=False,
     )

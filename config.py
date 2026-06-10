@@ -13,6 +13,7 @@ class GarminDownloaderConfig:
     download_format: str
     subfolder_per_format: bool
     reorder_existing_filestructure: bool
+    use_parent_activity_type: bool = False
     # Optional fields that can be set via environment variables, but are not required
     user_email: str | None = None
     user_password: str | None = None
@@ -36,6 +37,7 @@ class GarminDownloaderConfig:
                 f"download_format='{self.download_format}', "
                 f"subfolder_per_format={self.subfolder_per_format}, "
                 f"reorder_existing_filestructure={self.reorder_existing_filestructure}, "
+                f"use_parent_activity_type={self.use_parent_activity_type}, "
                 f"max_activities_to_download={self.max_activities_to_download}, "
                 f"dockermode={self.dockermode}, "
                 f"downloadinterval={self.downloadinterval}, "
@@ -105,6 +107,7 @@ class GarminDownloaderConfig:
             download_format=download_format,
             subfolder_per_format=os.getenv("SUBFOLDER_PER_FORMAT", "false").lower() == "true",
             reorder_existing_filestructure=os.getenv("REORDER_EXISTING_FILESTRUCTURE", "false").lower() == "true",
+            use_parent_activity_type=os.getenv("USE_PARENT_ACTIVITY_TYPE", "false").lower() == "true",
             dockermode=os.getenv("DOCKERMODE", "true").lower() == "true",
             downloadinterval=downloadinterval,
             schedule_time=schedule_time,
