@@ -116,7 +116,8 @@ class GarminDownloaderDB:
             else:
                 already_seen_files.add((file_path, file_type))
         self.conn.commit()
-        logger.info(f"Cleanup completed: {deleted_count} orphaned entries removed.")
+        if deleted_count > 0:
+            logger.info(f"Cleanup completed: {deleted_count} orphaned entries removed.")
 
     def _should_delete_entry(self, file_path: str, filetype: str, already_seen_files: set) -> bool:
         """
