@@ -4,8 +4,8 @@ services:
     container_name: garminactivitydownloader
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "9000:9000"     # Browser-based terminal for interactive login and MFA
     env_file:
       - .env
     volumes:
-      - /app/data:/app/data
+      - ./data:/app/data  # All data (downloads, database, logs, tokens) persists here
