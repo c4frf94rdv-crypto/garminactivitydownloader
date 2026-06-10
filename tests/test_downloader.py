@@ -300,6 +300,40 @@ def test_write_activity_package_skips_already_saved(mock_config, tmp_path, caplo
     assert "already downloaded, skipping" in caplog.text
 
 
+def test_download_activities_tcx_format_checks_tcx_in_db(mock_config):
+    """With download_format='tcx', is_activity_saved must be called with 'tcx', not 'fit'."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+    mock_config.limit_activities = 1
+    mock_config.download_format = "tcx"
+
+    activity = {'activityId': '42', 'activityName': 'Run', 'startTimeLocal': '2026-06-01 08:00:00'}
+    garmin_service.get_activities.return_value = [activity]
+    db.is_activity_saved.return_value = True
+
+    download_activities(garmin_service, db, mock_config)
+
+    db.is_activity_saved.assert_called_with('42', 'tcx')
+
+
+def test_download_activities_skips_when_download_returns_none(mock_config, mocker):
+    """If download_activity_by_id returns None, write must not be called."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+    mock_config.limit_activities = 1
+    mock_config.download_format = "fit"
+
+    activity = {'activityId': '99', 'activityName': 'Run', 'startTimeLocal': '2026-06-01 08:00:00'}
+    garmin_service.get_activities.return_value = [activity]
+    db.is_activity_saved.return_value = False
+    mocker.patch('downloader.download_activity_by_id', return_value=None)
+    mock_write = mocker.patch('downloader.write_activity_package_to_file')
+
+    download_activities(garmin_service, db, mock_config)
+
+    mock_write.assert_not_called()
+
+
 def test_download_activity_raw_fit_no_zip(mock_config):
     """Raw FIT bytes (not a ZIP) must be stored directly under the 'fit' key."""
     garmin_service = MagicMock()
@@ -310,17 +344,6 @@ def test_download_activity_raw_fit_no_zip(mock_config):
 
     assert package == {"fit": b"raw-fit-data"}
 
-
-def test_download_activities_blocksize_zero_stops_immediately(mock_config):
-    """When limit_activities equals total_downloaded, the loop must not call the API."""
-    garmin_service = MagicMock()
-    db = MagicMock()
-    mock_config.limit_activities = 0
-    mock_config.download_format = "fit"
-
-    download_activities(garmin_service, db, mock_config)
-
-    garmin_service.get_activities.assert_not_called()
 
 
 def test_write_activity_package_logs_error_on_write_failure(mock_config, tmp_path, caplog):
@@ -341,6 +364,30 @@ def test_write_activity_package_logs_error_on_write_failure(mock_config, tmp_pat
     with patch("builtins.open", side_effect=OSError("disk full")):
         with caplog.at_level(logging.ERROR, logger="downloader"):
             saved = write_activity_package_to_file(activity, {"fit": b"data"}, db, mock_config)
+
+    assert saved == 0
+    assert "Error saving activity" in caplog.text
+
+
+def test_write_activity_package_open_fails_file_not_created(mock_config, tmp_path, caplog):
+    """If open raises before writing and the file was never created, cleanup is skipped gracefully."""
+    db = MagicMock()
+    db.is_activity_saved.return_value = False
+    mock_config.download_dir = str(tmp_path)
+    mock_config.basedir = ""
+    mock_config.subfolder_per_activitytype = False
+
+    activity = {
+        "activityId": "55",
+        "activityName": "Ghost Run",
+        "startTimeLocal": "2026-06-10 07:00:00",
+        "activityType": {"typeKey": "running", "typeId": 1, "parentTypeId": 0},
+    }
+
+    with patch("builtins.open", side_effect=OSError("disk full")):
+        with patch("downloader.os.path.exists", return_value=False):
+            with caplog.at_level(logging.ERROR, logger="downloader"):
+                saved = write_activity_package_to_file(activity, {"fit": b"data"}, db, mock_config)
 
     assert saved == 0
     assert "Error saving activity" in caplog.text

@@ -13,7 +13,7 @@ def migrate_filename_template(db, config):
     for row in rows:
         activity, filetype, file_path = row_to_activity(row, config)
         new_file_path = os.path.join(os.path.dirname(file_path),  generate_filename(activity, filetype, config))
-        if file_path != new_file_path:
+        if os.path.normpath(file_path) != os.path.normpath(new_file_path):
             if not os.path.exists(file_path):
                 logger.warning(f"File {file_path} could not be found on disk. Skipping migration for this entry.")
                 continue
@@ -35,7 +35,7 @@ def migrate_file_structure(db, config):
         activity, filetype, file_path = row_to_activity(row, config)
         new_download_dir = get_downloadpath_by_activitytype(activity, filetype, config)
         new_file_path = os.path.join(new_download_dir, os.path.basename(file_path))
-        if file_path != new_file_path:
+        if os.path.normpath(file_path) != os.path.normpath(new_file_path):
             os.makedirs(new_download_dir, exist_ok=True)
             relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir)).replace(os.sep, "/")
             db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)

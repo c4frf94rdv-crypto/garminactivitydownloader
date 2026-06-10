@@ -150,6 +150,31 @@ def test_main_docker_loop_logs_exception_and_continues(mock_config, tmp_path, mo
     assert "Garmin API unavailable" in caplog.text
 
 
+def test_main_runs_once_when_dockermode_false(mock_config, tmp_path, mocker, caplog):
+    """With DOCKERMODE=false the program must run exactly one download and then exit."""
+    mock_config.dockermode = False
+    mock_config.basedir = str(tmp_path)
+
+    mocker.patch.object(GarminDownloaderConfig, "from_env", return_value=(mock_config, []))
+    mock_run = mocker.patch("main.rundownloader")
+
+    main()
+
+    mock_run.assert_called_once()
+
+
+def test_main_outer_exception_is_logged(mocker, caplog):
+    """An unexpected exception before config loads must be caught and logged."""
+    mocker.patch.object(
+        GarminDownloaderConfig, "from_env", side_effect=RuntimeError("unexpected crash")
+    )
+
+    with caplog.at_level(logging.ERROR, logger="main"):
+        main()
+
+    assert "unexpected crash" in caplog.text
+
+
 def test_main_invalid_config(caplog):
     """Ensures the application terminates gracefully when configuration errors occur."""
     with patch.object(GarminDownloaderConfig, "from_env", return_value=(None, ["DOWNLOAD_DIR is required"])):

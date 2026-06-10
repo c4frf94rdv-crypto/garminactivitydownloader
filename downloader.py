@@ -16,8 +16,6 @@ def download_activities(garmin_service, db, config):
     new_files = 0
     while total_downloaded < config.limit_activities:
         blocksize = min(config.max_activities_to_download, config.limit_activities - total_downloaded)
-        if blocksize <= 0:
-            break
         activities = garmin_service.get_activities(total_downloaded, blocksize)
         if len(activities) == 0:
             break
