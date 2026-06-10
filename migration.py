@@ -17,7 +17,7 @@ def migrate_filename_template(db, config):
             if not os.path.exists(file_path):
                 logger.warning(f"File {file_path} could not be found on disk. Skipping migration for this entry.")
                 continue
-            relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir))
+            relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir)).replace(os.sep, "/")
             db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
             os.rename(file_path, new_file_path)
             logger.debug(f"Renamed {file_path} to {new_file_path}")
@@ -37,7 +37,7 @@ def migrate_file_structure(db, config):
         new_file_path = os.path.join(new_download_dir, os.path.basename(file_path))
         if file_path != new_file_path:
             os.makedirs(new_download_dir, exist_ok=True)
-            relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir))
+            relative_new_path = os.path.relpath(new_file_path, os.path.join(config.basedir, config.download_dir)).replace(os.sep, "/")
             db.update_activity_file_path(activity["activityId"], relative_new_path, filetype)
             os.rename(file_path, new_file_path)
             logger.debug(f"Moved {file_path} to {new_file_path}")

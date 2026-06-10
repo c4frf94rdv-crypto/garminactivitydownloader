@@ -97,7 +97,7 @@ def write_activity_package_to_file(activity, activites_package, db, config) -> i
                 except Exception:
                     pass
                 raise
-            relative_file_path = os.path.relpath(file_path, os.path.join(config.basedir, config.download_dir))
+            relative_file_path = os.path.relpath(file_path, os.path.join(config.basedir, config.download_dir)).replace(os.sep, "/")
             # Save activity info to database even if the file writing fails, in that case the orphaned database entry will be cleaned up in the next run of the script
             db.save_activity_to_db(activity['activityId'], 
                                     filetype,

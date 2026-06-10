@@ -24,17 +24,16 @@ def test_migrate_file_structure_reorder(mock_config, tmp_path):
     expected_new_path = tmp_path / "fit" / "running" / "activity.fit"
     assert expected_new_path.exists()
     
-    expected_rel_path = os.path.join("fit", "running", "activity.fit")
-    db.update_activity_file_path.assert_called_once_with("201", expected_rel_path, "fit")
+    db.update_activity_file_path.assert_called_once_with("201", "fit/running/activity.fit", "fit")
 
 
-def test_migration_skips_if_file_missing(mock_config, caplog):
+def test_migration_skips_if_file_missing(mock_config, tmp_path, caplog):
     db = MagicMock()
     db.get_all_activities.return_value = [
         ("404", "fit", "Ghost Run", "2026-05-01 00:00:00", "running/non_existent.fit", "running", 1, 0)
     ]
-    mock_config.download_dir = "/tmp/fake_dir"
-    
+    mock_config.download_dir = str(tmp_path / "non_existent_subdir")
+
     migrate_filename_template(db, mock_config)
     
     assert db.update_activity_file_path.call_count == 0
@@ -74,8 +73,8 @@ def test_migrate_filename_template_success(mock_config, mocker, tmp_path):
     assert new_cycle_file.exists()
     
     expected_calls = [
-        call("101", os.path.join("running", "2026-01-01_Morning Run.fit"), "fit"),
-        call("102", os.path.join("cycling", "2026-01-02_Lunch Ride.fit"), "fit")
+        call("101", "running/2026-01-01_Morning Run.fit", "fit"),
+        call("102", "cycling/2026-01-02_Lunch Ride.fit", "fit")
     ]
     db.update_activity_file_path.assert_has_calls(expected_calls, any_order=True)
 
