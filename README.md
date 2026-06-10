@@ -30,7 +30,7 @@ Open `http://localhost:9000` in your browser. A terminal opens where you can com
 
 ## Quick Start (Local)
 
-**Requirements:** Python 3.11+
+**Requirements:** Python 3.12+
 
 ```bash
 python -m venv .venv
