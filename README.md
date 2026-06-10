@@ -4,6 +4,10 @@ Automatically downloads activity files from Garmin Connect and saves them locall
 
 ---
 
+> **Disclaimer:** This project is not affiliated with, endorsed by, or connected to Garmin Ltd. in any way. Use of this tool may violate [Garmin's Terms of Service](https://www.garmin.com/en-US/legal/atdisclaimer/). Use it at your own risk. The author assumes no liability for any consequences, including account suspension or legal action.
+
+---
+
 ## Quick Start (Docker)
 
 **1. Create your configuration:**
