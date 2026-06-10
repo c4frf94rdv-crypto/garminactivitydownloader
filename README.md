@@ -141,10 +141,22 @@ data/
 
 | Variable | Default | Description |
 |---|---|---|
-| `DOCKERMODE` | `true` | Run continuously, downloading at each interval |
+| `DOCKERMODE` | `true` | Run continuously; set to `false` to download once and exit |
 | `DOWNLOADINTERVAL` | `86400` | Seconds between download runs (default: 24 hours) |
+| `SCHEDULE_TIME` | *(not set)* | Optional fixed start time in `HH:MM` format (24-hour) |
 
-With `DOCKERMODE=false` the program downloads once and exits — useful for local use or scheduled runs via cron.
+The program always downloads immediately on startup. After that:
+
+- **Without `SCHEDULE_TIME`:** waits `DOWNLOADINTERVAL` seconds, then repeats.
+- **With `SCHEDULE_TIME`:** waits until the next occurrence of that time, then repeats every `DOWNLOADINTERVAL` seconds from that anchor.
+
+Examples:
+
+| Goal | Configuration |
+|---|---|
+| Daily at 18:00 | `SCHEDULE_TIME=18:00` + `DOWNLOADINTERVAL=86400` |
+| Every 6 hours starting at 10:00 | `SCHEDULE_TIME=10:00` + `DOWNLOADINTERVAL=21600` |
+| Weekly (same weekday, 10:00) | `SCHEDULE_TIME=10:00` + `DOWNLOADINTERVAL=604800` |
 
 > **Note:** Garmin Connect enforces rate limits. Avoid setting `DOWNLOADINTERVAL` below a few hours.
 

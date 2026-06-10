@@ -1,7 +1,7 @@
 import os
 import logging
 import time
-import sys
+from datetime import datetime, timedelta
 from database import GarminDownloaderDB
 from garminservice import GarminService
 from config import GarminDownloaderConfig
@@ -30,19 +30,26 @@ def rundownloader(config):
             migrate_file_structure(db, config)
         download_activities(client, db, config)
 
-def _countdown_timer(total_seconds):
-    remaining_minutes = total_seconds // 60
-    while remaining_minutes > 0:
-        hours, minutes = divmod(remaining_minutes, 60)
-        
-        sys.stdout.write(f"\rRunning in Docker mode. Next download in: {hours:02d}h {minutes:02d}m ...")
-        sys.stdout.flush()
-        
-        time.sleep(60) # sleep for 60 seconds
-        remaining_minutes -= 1
-        
-    # clear line after countdown ends
-    print("\r" + " " * 50 + "\r", end="")
+def _next_scheduled_run(schedule_time: str, interval_seconds: int, after: datetime) -> datetime:
+    """Calculate the next run time based on SCHEDULE_TIME and DOWNLOADINTERVAL.
+
+    Starting from the first occurrence of schedule_time on or after `after`,
+    advance by interval_seconds until the result is in the future.
+    """
+    h, m = map(int, schedule_time.split(":"))
+    anchor = after.replace(hour=h, minute=m, second=0, microsecond=0)
+    while anchor <= after:
+        anchor += timedelta(seconds=interval_seconds)
+    return anchor
+
+def _wait_until_next_run(config) -> None:
+    now = datetime.now()
+    if config.schedule_time:
+        next_run = _next_scheduled_run(config.schedule_time, config.downloadinterval, now)
+    else:
+        next_run = now + timedelta(seconds=config.downloadinterval)
+    logger.info(f"Next download scheduled at: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+    time.sleep((next_run - datetime.now()).total_seconds())
 
 def main():
     try:
@@ -72,7 +79,7 @@ def main():
 
         if config.dockermode:
             while True:
-                _countdown_timer(config.downloadinterval)
+                _wait_until_next_run(config)
                 try:
                     rundownloader(config)
                 except Exception as e:

@@ -19,6 +19,7 @@ class GarminDownloaderConfig:
     max_activities_to_download: int = 1000  # Garmin Connect API allows to download max 1000 activities per request
     dockermode: bool = True  # Default to True, assuming most users will run in Docker
     downloadinterval: int = 86400  # Default to 24 hours in seconds
+    schedule_time: str | None = None  # Optional fixed start time, e.g. "18:00"
     basedir: str = field(default_factory=lambda: os.path.join(os.getcwd(), "data"))
 
     def __repr__(self) -> str:
@@ -38,6 +39,7 @@ class GarminDownloaderConfig:
                 f"max_activities_to_download={self.max_activities_to_download}, "
                 f"dockermode={self.dockermode}, "
                 f"downloadinterval={self.downloadinterval}, "
+                f"schedule_time={self.schedule_time}, "
                 f"basedir={self.basedir}"
         )
 
@@ -74,6 +76,20 @@ class GarminDownloaderConfig:
         except ValueError:
             errors.append(f"DOWNLOADINTERVAL must be an integer, got '{downloadinterval_str}'")
 
+        schedule_time_str = os.getenv("SCHEDULE_TIME", "").strip()
+        schedule_time = None
+        if schedule_time_str:
+            try:
+                time_parts = schedule_time_str.split(":")
+                if len(time_parts) != 2:
+                    raise ValueError()
+                h, m = int(time_parts[0]), int(time_parts[1])
+                if not (0 <= h <= 23 and 0 <= m <= 59):
+                    raise ValueError()
+                schedule_time = schedule_time_str
+            except ValueError:
+                errors.append(f"SCHEDULE_TIME must be in HH:MM format (e.g. 18:00), got '{schedule_time_str}'")
+
         if errors:
             return None, errors
 
@@ -91,5 +107,6 @@ class GarminDownloaderConfig:
             reorder_existing_filestructure=os.getenv("REORDER_EXISTING_FILESTRUCTURE", "false").lower() == "true",
             dockermode=os.getenv("DOCKERMODE", "true").lower() == "true",
             downloadinterval=downloadinterval,
+            schedule_time=schedule_time,
             basedir=os.getenv("BASEDIR", os.path.join(os.getcwd(), "data"))
         ),[]
