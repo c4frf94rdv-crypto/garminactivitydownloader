@@ -5,7 +5,7 @@ from database import GarminDownloaderDB
 
 # Helper class for configuration (mock object)
 class MockConfig:
-    def __init__(self, download_dir=".", db_file=":memory:", basedir = "."):
+    def __init__(self, download_dir="", db_file=":memory:", basedir=""):
         self.download_dir = download_dir
         self.db_file = db_file
         self.basedir = basedir

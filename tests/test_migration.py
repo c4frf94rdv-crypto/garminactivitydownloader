@@ -74,8 +74,8 @@ def test_migrate_filename_template_success(mock_config, mocker, tmp_path):
     assert new_cycle_file.exists()
     
     expected_calls = [
-        call("101", "running/2026-01-01_Morning Run.fit", "fit"),
-        call("102", "cycling/2026-01-02_Lunch Ride.fit", "fit")
+        call("101", os.path.join("running", "2026-01-01_Morning Run.fit"), "fit"),
+        call("102", os.path.join("cycling", "2026-01-02_Lunch Ride.fit"), "fit")
     ]
     db.update_activity_file_path.assert_has_calls(expected_calls, any_order=True)
 
