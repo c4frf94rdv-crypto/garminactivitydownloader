@@ -26,5 +26,8 @@ __pycache__/
 .venv/
 venv/
 
+# IDE
+.vscode/
+
 # macOS
 .DS_Store
