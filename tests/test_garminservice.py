@@ -148,27 +148,68 @@ def test_interactive_login_success(mock_input, mock_getpass, mock_garmin_class, 
     # Ensure the client was successfully attached to the service
     assert service.client == mock_client
 
-    @pytest.mark.parametrize("raised_exception, expected_log", [
-        # Branch 1: Authentication Error
-        (GarminConnectAuthenticationError("Auth Failed"), 
-        "Authentication failed. Please check your credentials"),
-        
-        # Branch 2: Connection Error
-        (GarminConnectConnectionError("No Internet"), 
-        "Connection error occurred while trying to log in"),
-        
-        # Branch 3: Generic/Unexpected Error
-        (Exception("Unknown Error"), 
-        "An unexpected error occurred during login")
-    ])
-    def test_handle_login_error_branches(service, raised_exception, expected_log, caplog):
-        """
-        Tests the different branches of _handle_login_error to ensure 
-        correct logging and re-raising of exceptions.
-        """
-        # We call the internal method directly to test the branching logic
-        with pytest.raises(type(raised_exception)):
-            service._handle_login_error(raised_exception)
-        
-        # Verify that the correct log message was recorded
-        assert expected_log in caplog.text
+
+@pytest.mark.parametrize("raised_exception, expected_log", [
+    (GarminConnectAuthenticationError("Auth Failed"),
+     "Authentication failed. Please check your credentials"),
+    (GarminConnectConnectionError("No Internet"),
+     "Connection error occurred while trying to log in"),
+    (GarminConnectTooManyRequestsError("Rate limit"),
+     "Too many requests"),
+    (Exception("Unknown Error"),
+     "An unexpected error occurred during login"),
+])
+def test_handle_login_error_branches(service, raised_exception, expected_log, caplog):
+    """Tests each branch of _handle_login_error for correct logging and re-raise."""
+    with pytest.raises(type(raised_exception)):
+        service._handle_login_error(raised_exception)
+    assert expected_log in caplog.text
+
+
+@patch("garminservice.Garmin")
+def test_login_too_many_requests_on_token_login_raises(mock_garmin_class, service):
+    """TooManyRequests during token login must be re-raised immediately."""
+    mock_garmin_class.return_value.login.side_effect = GarminConnectTooManyRequestsError
+    with pytest.raises(GarminConnectTooManyRequestsError):
+        service.login()
+
+
+@patch("garminservice.Garmin")
+@patch("garminservice.getpass.getpass")
+@patch("garminservice.input")
+def test_login_credential_failure_falls_back_to_interactive(mock_input, mock_getpass, mock_garmin_class, service):
+    """If credential login fails, login() falls back to interactive_login()."""
+    token_client = MagicMock()
+    token_client.login.side_effect = GarminConnectAuthenticationError
+    credential_client = MagicMock()
+    credential_client.login.side_effect = GarminConnectAuthenticationError("bad credentials")
+    interactive_client = MagicMock()
+
+    mock_garmin_class.side_effect = [token_client, credential_client, interactive_client]
+    mock_input.return_value = "user@example.com"
+    mock_getpass.return_value = "password"
+
+    with pytest.raises(GarminConnectAuthenticationError):
+        service.login()
+
+
+def test_download_activity_not_logged_in(service):
+    """download_activity must raise RuntimeError when called without prior login."""
+    with pytest.raises(RuntimeError, match="Not logged in"):
+        service.download_activity("123", "fit")
+
+
+@pytest.mark.parametrize("exception, expected_log", [
+    (GarminConnectConnectionError, "Connection error"),
+    (GarminConnectTooManyRequestsError, "Too many requests"),
+])
+def test_download_activity_error_handling(service, exception, expected_log, caplog):
+    """API errors during download must be logged and re-raised."""
+    service.client = MagicMock()
+    service.client.download_activity.side_effect = exception
+
+    with pytest.raises(exception):
+        service.download_activity("123", "fit")
+
+    assert expected_log in caplog.text
+

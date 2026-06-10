@@ -8,15 +8,14 @@ def clean_env(mocker):
     Fixture to clear environment variables and mock load_dotenv.
     This ensures tests are not affected by an actual .env file.
     """
-    # Prevent from_env() from loading the actual .env file from disk
     mocker.patch("config.load_dotenv")
-    
+
     keys = [
-        "DOWNLOAD_DIR", "DB_FILE", "LIMIT_ACTIVITIES", 
+        "DOWNLOAD_DIR", "DB_FILE", "LIMIT_ACTIVITIES",
         "SUBFOLDER_PER_ACTIVITYTYPE", "FILENAME_TEMPLATE",
-        "RENAME_EXISTING_FILES", "DOWNLOAD_FORMAT", 
+        "RENAME_EXISTING_FILES", "DOWNLOAD_FORMAT",
         "SUBFOLDER_PER_FORMAT", "REORDER_EXISTING_FILESTRUCTURE",
-        "USER_EMAIL", "USER_PASSWORD"
+        "USER_EMAIL", "USER_PASSWORD", "DOWNLOADINTERVAL", "SCHEDULE_TIME",
     ]
     for key in keys:
         if key in os.environ:
@@ -210,6 +209,71 @@ def test_config_multiple_errors(clean_env):
     assert any("DOWNLOAD_DIR is required" in err for err in errors)
     assert any("DOWNLOAD_FORMAT must be" in err for err in errors)
     assert any("LIMIT_ACTIVITIES must be an integer" in err for err in errors)
+
+def test_config_invalid_downloadinterval_type(clean_env):
+    """Non-integer DOWNLOADINTERVAL must produce a validation error."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["DOWNLOADINTERVAL"] = "daily"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert config is None
+    assert any("DOWNLOADINTERVAL must be an integer" in err for err in errors)
+
+
+def test_config_invalid_downloadinterval_too_low(clean_env):
+    """DOWNLOADINTERVAL below 1 must produce a validation error."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["DOWNLOADINTERVAL"] = "0"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert config is None
+    assert any("DOWNLOADINTERVAL must be >= 1" in err for err in errors)
+
+
+def test_config_valid_schedule_time(clean_env):
+    """A valid SCHEDULE_TIME is parsed and stored correctly."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["SCHEDULE_TIME"] = "18:00"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert len(errors) == 0
+    assert config.schedule_time == "18:00"
+
+
+def test_config_invalid_schedule_time_format(clean_env):
+    """SCHEDULE_TIME with wrong format must produce a validation error."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["SCHEDULE_TIME"] = "6pm"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert config is None
+    assert any("SCHEDULE_TIME must be in HH:MM format" in err for err in errors)
+
+
+def test_config_invalid_schedule_time_out_of_range(clean_env):
+    """SCHEDULE_TIME with out-of-range values must produce a validation error."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["SCHEDULE_TIME"] = "25:00"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert config is None
+    assert any("SCHEDULE_TIME must be in HH:MM format" in err for err in errors)
+
+
+def test_config_schedule_time_not_set_defaults_to_none(clean_env):
+    """When SCHEDULE_TIME is not set, schedule_time must default to None."""
+    os.environ["DOWNLOAD_DIR"] = "."
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert len(errors) == 0
+    assert config.schedule_time is None
+
 
 def test_config_boolean_fallback_on_invalid_string(clean_env):
     """

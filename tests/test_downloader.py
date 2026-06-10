@@ -1,8 +1,9 @@
 import io
 import logging
 import zipfile
+from unittest.mock import MagicMock, call, patch
+from garminconnect.exceptions import GarminConnectConnectionError
 from downloader import download_activities, download_activity_by_id, write_activity_package_to_file
-from unittest.mock import MagicMock, call
 
 def test_download_activities_skips_existing(mock_config, mocker):
     """Tests that the function skips activities that are already present in the database."""
@@ -178,15 +179,193 @@ def test_download_activities_mixed_new_and_existing(mock_config, mocker, caplog)
 def test_download_activity_zip_handling(mock_config):
     """Tests if .fit files are correctly extracted from a Garmin API ZIP response."""
     garmin_service = MagicMock()
-    
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "a") as zf:
         zf.writestr("activity_123.fit", b"fit-binary-content")
     zip_data = zip_buffer.getvalue()
-    
+
     garmin_service.download_activity.return_value = zip_data
     mock_config.download_format = "fit"
 
     package = download_activity_by_id(garmin_service, "123", mock_config)
     assert "fit" in package
     assert package["fit"] == b"fit-binary-content"
+
+
+def test_download_activity_zip_gpx_fallback(mock_config, caplog):
+    """If ZIP contains no .fit file, the .gpx file is used as fallback."""
+    garmin_service = MagicMock()
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a") as zf:
+        zf.writestr("track.gpx", b"gpx-content")
+    garmin_service.download_activity.return_value = zip_buffer.getvalue()
+    mock_config.download_format = "fit"
+
+    package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert "gpx" in package
+    assert package["gpx"] == b"gpx-content"
+
+
+def test_download_activity_zip_no_fit_no_gpx_logs_warning(mock_config, caplog):
+    """If ZIP contains neither .fit nor .gpx, a warning is logged."""
+    garmin_service = MagicMock()
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a") as zf:
+        zf.writestr("readme.txt", b"nothing useful")
+    garmin_service.download_activity.return_value = zip_buffer.getvalue()
+    mock_config.download_format = "fit"
+
+    with caplog.at_level(logging.WARNING, logger="downloader"):
+        package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert "No .fit or .gpx file found" in caplog.text
+    assert package == {}
+
+
+def test_download_activity_bad_zip_logs_error(mock_config, caplog):
+    """Invalid ZIP data must log an error and return an empty package."""
+    garmin_service = MagicMock()
+    garmin_service.download_activity.return_value = b"PK\x03\x04not-a-real-zip"
+    mock_config.download_format = "fit"
+
+    with caplog.at_level(logging.ERROR, logger="downloader"):
+        package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert "Invalid ZIP file" in caplog.text
+    assert package == {}
+
+
+def test_download_activity_fit_connection_error_returns_none(mock_config, caplog):
+    """GarminConnectConnectionError during FIT download must log and return None."""
+    garmin_service = MagicMock()
+    garmin_service.download_activity.side_effect = GarminConnectConnectionError
+    mock_config.download_format = "fit"
+
+    with caplog.at_level(logging.ERROR, logger="downloader"):
+        result = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert result is None
+    assert "FIT Download failed" in caplog.text
+
+
+def test_download_activity_tcx_connection_error_logs_and_continues(mock_config, caplog):
+    """GarminConnectConnectionError during TCX download must log but return partial package."""
+    garmin_service = MagicMock()
+    garmin_service.download_activity.side_effect = GarminConnectConnectionError
+    mock_config.download_format = "tcx"
+
+    with caplog.at_level(logging.ERROR, logger="downloader"):
+        package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert "TCX download failed" in caplog.text
+    assert package == {}
+
+
+def test_download_activities_stops_when_api_returns_empty(mock_config):
+    """Pagination must stop when the API returns an empty activity list."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+    mock_config.limit_activities = 100
+    mock_config.download_format = "fit"
+
+    garmin_service.get_activities.return_value = []
+
+    download_activities(garmin_service, db, mock_config)
+
+    garmin_service.get_activities.assert_called_once_with(0, 100)
+
+
+def test_write_activity_package_skips_already_saved(mock_config, tmp_path, caplog):
+    """write_activity_package_to_file must skip files already recorded in the DB."""
+    db = MagicMock()
+    db.is_activity_saved.return_value = True
+    mock_config.download_dir = str(tmp_path)
+    mock_config.basedir = ""
+
+    activity = {
+        "activityId": "42",
+        "activityName": "Test Run",
+        "startTimeLocal": "2026-06-10 08:00:00",
+        "activityType": {"typeKey": "running", "typeId": 1, "parentTypeId": 0},
+    }
+
+    with caplog.at_level(logging.DEBUG, logger="downloader"):
+        saved = write_activity_package_to_file(activity, {"fit": b"data"}, db, mock_config)
+
+    assert saved == 0
+    assert "already downloaded, skipping" in caplog.text
+
+
+def test_download_activity_raw_fit_no_zip(mock_config):
+    """Raw FIT bytes (not a ZIP) must be stored directly under the 'fit' key."""
+    garmin_service = MagicMock()
+    garmin_service.download_activity.return_value = b"raw-fit-data"
+    mock_config.download_format = "fit"
+
+    package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert package == {"fit": b"raw-fit-data"}
+
+
+def test_download_activities_blocksize_zero_stops_immediately(mock_config):
+    """When limit_activities equals total_downloaded, the loop must not call the API."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+    mock_config.limit_activities = 0
+    mock_config.download_format = "fit"
+
+    download_activities(garmin_service, db, mock_config)
+
+    garmin_service.get_activities.assert_not_called()
+
+
+def test_write_activity_package_logs_error_on_write_failure(mock_config, tmp_path, caplog):
+    """An OS error during file write must be logged and the function must return 0."""
+    db = MagicMock()
+    db.is_activity_saved.return_value = False
+    mock_config.download_dir = str(tmp_path)
+    mock_config.basedir = ""
+    mock_config.subfolder_per_activitytype = False
+
+    activity = {
+        "activityId": "99",
+        "activityName": "Broken Run",
+        "startTimeLocal": "2026-06-10 09:00:00",
+        "activityType": {"typeKey": "running", "typeId": 1, "parentTypeId": 0},
+    }
+
+    with patch("builtins.open", side_effect=OSError("disk full")):
+        with caplog.at_level(logging.ERROR, logger="downloader"):
+            saved = write_activity_package_to_file(activity, {"fit": b"data"}, db, mock_config)
+
+    assert saved == 0
+    assert "Error saving activity" in caplog.text
+
+
+def test_write_activity_package_cleanup_failure_is_swallowed(mock_config, tmp_path, caplog):
+    """If the orphan-file cleanup itself raises, the error is swallowed and activity error is still logged."""
+    db = MagicMock()
+    db.is_activity_saved.return_value = False
+    mock_config.download_dir = str(tmp_path)
+    mock_config.basedir = ""
+    mock_config.subfolder_per_activitytype = False
+
+    activity = {
+        "activityId": "77",
+        "activityName": "Cleanup Fail Run",
+        "startTimeLocal": "2026-06-10 10:00:00",
+        "activityType": {"typeKey": "running", "typeId": 1, "parentTypeId": 0},
+    }
+
+    with patch("builtins.open", side_effect=OSError("disk full")):
+        with patch("downloader.os.path.exists", return_value=True):
+            with patch("downloader.os.remove", side_effect=OSError("permission denied")):
+                with caplog.at_level(logging.ERROR, logger="downloader"):
+                    saved = write_activity_package_to_file(activity, {"fit": b"data"}, db, mock_config)
+
+    assert saved == 0
+    assert "Error saving activity" in caplog.text
