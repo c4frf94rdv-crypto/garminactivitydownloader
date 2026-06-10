@@ -121,32 +121,6 @@ def test_config_repr_masking():
 def test_config_invalid_limit_value_too_low(clean_env):
     """
     Ensures that if LIMIT_ACTIVITIES is less than 1, an error is added 
-    and the value defaults to 5.
-    """
-    os.environ["DOWNLOAD_DIR"] = "."
-    # Testing with a value less than 1 (zero or negative)
-    os.environ["LIMIT_ACTIVITIES"] = "0"
-    
-    config, errors = GarminDownloaderConfig.from_env()
-    
-    # Verify that the specific error message is present
-    assert any("LIMIT_ACTIVITIES must be >= 1" in err for err in errors)
-    
-    # Even though there are errors, the method returns a config object 
-    # in your implementation because the error check 'if errors: return None, errors' 
-    # happens BEFORE this specific check or the logic continues.
-    # Note: Based on your config.py, the final return happens only if errors is empty 
-    # at a specific point. Let's verify the logic flow.
-    
-    if config:
-        assert config.limit_activities == 5
-    else:
-        # If your from_env() returns (None, errors) when ANY error occurs:
-        assert config is None
-
-def test_config_invalid_limit_value_too_low(clean_env):
-    """
-    Ensures that if LIMIT_ACTIVITIES is less than 1, an error is added 
     and the config object is not created.
     """
     os.environ["DOWNLOAD_DIR"] = "."

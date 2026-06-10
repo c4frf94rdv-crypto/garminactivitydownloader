@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Any, Literal, LiteralString
 import pytest
 from file_utils import SafeDict, ensure_unique_filename, get_downloadpath_by_activitytype, generate_filename
 
@@ -14,56 +13,49 @@ def test_ensure_unique_filename_collision(tmp_path: Path):
     """Tests the loop and counter increments inside ensure_unique_filename."""
     test_dir = str(tmp_path)
     filename = "run.fit"
-    
-    # Szenario 1: Keine Kollision (Counter-Schleife läuft genau 1x durch)
-    name_first = ensure_unique_filename(test_dir, filename)
-    assert name_first == "run.fit"
+
+    # No collision on first call
+    assert ensure_unique_filename(test_dir, filename) == "run.fit"
     assert os.path.exists(os.path.join(test_dir, "run.fit"))
 
-    # Szenario 2: Einfache Kollision (Counter springt auf _1, Schleife läuft 2x)
-    name_second = ensure_unique_filename(test_dir, filename)
-    assert name_second == "run_1.fit"
+    # Single collision: counter advances to _1
+    assert ensure_unique_filename(test_dir, filename) == "run_1.fit"
     assert os.path.exists(os.path.join(test_dir, "run_1.fit"))
 
-    # Szenario 3: Mehrfache Kollision (Wir blockieren manuell run_2.fit auf der Disk)
+    # Block run_2.fit manually so the loop must skip it and land on _3
     with open(os.path.join(test_dir, "run_2.fit"), "w") as f:
         f.write("placeholder")
-        
-    # Jetzt muss die Schleife so lange hochzählen, bis sie bei _3 ein freies Loch findet
-    name_third = ensure_unique_filename(test_dir, filename)
-    assert name_third == "run_3.fit"
+
+    assert ensure_unique_filename(test_dir, filename) == "run_3.fit"
     assert os.path.exists(os.path.join(test_dir, "run_3.fit"))
 
 def test_get_downloadpath_logic(mock_config):
     """Verifies all conditional branches of get_downloadpath_by_activitytype."""
     activity_cycling = {"activityType": {"typeKey": "cycling"}}
-    activity_missing_key = {"activityType": {}}  # Provorziert das 'unknown' Fallback im Code
+    activity_missing_key = {"activityType": {}}  # triggers the 'unknown' fallback
 
-    # Zweig A: Keine Unterordner aktiv
+    # Branch A: no subfolders
     mock_config.subfolder_per_activitytype = False
     mock_config.subfolder_per_format = False
     path = get_downloadpath_by_activitytype(activity_cycling, "fit", mock_config)
     assert path.endswith("test_downloads")
 
-    # Zweig B: Nur Aktivitätstyp-Unterordner
+    # Branch B: activity type subfolder only
     mock_config.subfolder_per_activitytype = True
     mock_config.subfolder_per_format = False
     path = get_downloadpath_by_activitytype(activity_cycling, "fit", mock_config)
     assert path.endswith(os.path.join("test_downloads", "cycling"))
 
-    # Zweig C: Nur Format-Unterordner (Zweig-Abdeckung für "fit" / "gpx" Fallback)
+    # Branch C: format subfolder only — gpx falls back to "fit" folder
     mock_config.subfolder_per_activitytype = False
     mock_config.subfolder_per_format = True
-    path_fit = get_downloadpath_by_activitytype(activity_cycling, "fit", mock_config)
-    path_gpx = get_downloadpath_by_activitytype(activity_cycling, "gpx", mock_config)
-    assert os.path.basename(path_fit) == "fit"
-    assert os.path.basename(path_gpx) == "fit"
+    assert os.path.basename(get_downloadpath_by_activitytype(activity_cycling, "fit", mock_config)) == "fit"
+    assert os.path.basename(get_downloadpath_by_activitytype(activity_cycling, "gpx", mock_config)) == "fit"
 
-    # Zweig D: Nur Format-Unterordner für "tcx"
-    path_tcx = get_downloadpath_by_activitytype(activity_cycling, "tcx", mock_config)
-    assert os.path.basename(path_tcx) == "tcx"
+    # Branch D: format subfolder for tcx
+    assert os.path.basename(get_downloadpath_by_activitytype(activity_cycling, "tcx", mock_config)) == "tcx"
 
-    # Zweig E: Kombination aus Format & Aktivitätstyp (inkl. "unknown" Fallback-Zweig)
+    # Branch E: both subfolders active, missing typeKey triggers 'unknown' fallback
     mock_config.subfolder_per_activitytype = True
     mock_config.subfolder_per_format = True
     path_comb = get_downloadpath_by_activitytype(activity_missing_key, "tcx", mock_config)
@@ -71,7 +63,6 @@ def test_get_downloadpath_logic(mock_config):
     assert path_parts[-2:] == ["tcx", "unknown"]
 
 @pytest.mark.parametrize("activity_input, expected", [
-    # --- Existing & standard cases ---
     ({
         "activityId": "123",
         "activityName": "Lauf mit George",
@@ -90,7 +81,6 @@ def test_get_downloadpath_logic(mock_config):
         "startTimeLocal": "2026-05-31 12:00:00"
     }, "2026-05-31_Unnamed.fit"),
 
-    # --- New stress tests & edge cases ---
     ({
         "activityId": "100",
         "activityName": 'Lauf "Intervall" <Schnell>', 
@@ -174,7 +164,7 @@ def test_get_downloadpath_logic(mock_config):
 
     ("TEMPLATE_ONLY_SPECIAL", "_.fit"),
 ])
-def test_generate_filename_all_cases(mock_config, activity_input: dict[str, str] | dict[str, str | None] | dict[str, str | dict[Any, Any]] | dict[str, int | str] | Literal['UNKNOWN_KEY_TEMPLATE'] | Literal['TEMPLATE_TEST_SLASHES'] | Literal['TEMPLATE_ONLY_SPECIAL'], expected: LiteralString | Literal['2026-05-31_Lauf mit George.fit'] | Literal['2026-05-31_Lauf  Training.fit'] | Literal['2026-05-31_Unnamed.fit'] | Literal['2026-05-31_Lauf Intervall Schnell.fit'] | Literal['2026-05-31_Kurzer Zeitstempel.fit'] | Literal['2026-05-31_Typ Test.fit'] | Literal['2026-05-31_Lauf Ende.fit'] | Literal['2026-05-31_Missing ID Test.fit'] | Literal['2026-05-31_Numeric ID.fit'] | Literal['2026_Broken Date.fit'] | Literal['2026-05-31_{non_existent_key}_Test.fit'] | Literal['2026-05-31 Test.fit'] | Literal['2026-05-31_12345.fit'] | Literal['0000-00-00_No Date.fit'] | Literal['2026-05-31_......etcpasswd.fit'] | Literal['2026-05-31_LaufZweite Zeile.fit'] | Literal['_.fit']):
+def test_generate_filename_all_cases(mock_config, activity_input, expected):
     if activity_input == "UNKNOWN_KEY_TEMPLATE":
         mock_config.filename_template = "{activityStartDate}_{non_existent_key}_Test"
         activity = {"activityId": "1", "activityName": "Lauf", "startTimeLocal": "2026-05-31 10:00:00"}
