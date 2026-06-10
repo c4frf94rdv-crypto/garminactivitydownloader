@@ -29,7 +29,7 @@ def download_activities(garmin_service, db, config):
                 already_downloaded = already_downloaded and db.is_activity_saved(activity['activityId'], "tcx")
 
             if already_downloaded:
-                logger.debug(f" - {activity['activityName']} / fit at {activity['startTimeLocal']} already downloaded, skipping.")
+                logger.debug(f" - {activity['activityName']} / {config.download_format} at {activity['startTimeLocal']} already downloaded, skipping.")
                 continue
 
             activity_package = download_activity_by_id(garmin_service, activity['activityId'], config)

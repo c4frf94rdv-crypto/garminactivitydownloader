@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from dotenv import load_dotenv
 
@@ -19,7 +19,7 @@ class GarminDownloaderConfig:
     max_activities_to_download: int = 1000  # Garmin Connect API allows to download max 1000 activities per request
     dockermode: bool = True  # Default to True, assuming most users will run in Docker
     downloadinterval: int = 86400  # Default to 24 hours in seconds
-    basedir = os.path.join(os.getcwd(), "data")
+    basedir: str = field(default_factory=lambda: os.path.join(os.getcwd(), "data"))
 
     def __repr__(self) -> str:
         # Mask sensitive fields in output
@@ -37,7 +37,7 @@ class GarminDownloaderConfig:
                 f"reorder_existing_filestructure={self.reorder_existing_filestructure}, "
                 f"max_activities_to_download={self.max_activities_to_download}, "
                 f"dockermode={self.dockermode}, "
-                f"downloadinterval={self.downloadinterval}"
+                f"downloadinterval={self.downloadinterval}, "
                 f"basedir={self.basedir}"
         )
 
@@ -64,6 +64,16 @@ class GarminDownloaderConfig:
         except ValueError:
             errors.append(f"LIMIT_ACTIVITIES must be an integer, got '{limit_activities_str}'")
 
+        downloadinterval_str = os.getenv("DOWNLOADINTERVAL", "86400")
+        downloadinterval = 86400
+        try:
+            downloadinterval = int(downloadinterval_str)
+            if downloadinterval < 1:
+                errors.append(f"DOWNLOADINTERVAL must be >= 1, got {downloadinterval}")
+                downloadinterval = 86400
+        except ValueError:
+            errors.append(f"DOWNLOADINTERVAL must be an integer, got '{downloadinterval_str}'")
+
         if errors:
             return None, errors
 
@@ -80,5 +90,6 @@ class GarminDownloaderConfig:
             subfolder_per_format=os.getenv("SUBFOLDER_PER_FORMAT", "false").lower() == "true",
             reorder_existing_filestructure=os.getenv("REORDER_EXISTING_FILESTRUCTURE", "false").lower() == "true",
             dockermode=os.getenv("DOCKERMODE", "true").lower() == "true",
-            downloadinterval=int(os.getenv("DOWNLOADINTERVAL", "86400"))
+            downloadinterval=downloadinterval,
+            basedir=os.getenv("BASEDIR", os.path.join(os.getcwd(), "data"))
         ),[]

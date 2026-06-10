@@ -51,8 +51,8 @@ def generate_filename(activity, filetype, config) -> str:
         "activityType": activity_type,
     }
     filename = config.filename_template.format_map(SafeDict(data))
-    filename = filename[:240]
     filename = sanitize_filename(filename)
+    filename = filename[:240]
     if not filename.strip():
         filename = "_"
     return f"{filename}.{filetype}"

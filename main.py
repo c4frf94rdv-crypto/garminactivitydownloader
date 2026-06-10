@@ -48,20 +48,25 @@ def main():
     try:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
-        file_handler = logging.FileHandler("data/garmin_downloader.log")
-        file_handler.setLevel(logging.DEBUG)
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s [%(levelname)s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
-            handlers= [console_handler,file_handler]
+            handlers=[console_handler]
             )
         config, errors = GarminDownloaderConfig.from_env()
         if not config:
             logger.error("Invalid configuration:")
             for error in errors:
                 logger.error(f" - {error}")
-            return    
+            return
+
+        os.makedirs(config.basedir, exist_ok=True)
+        file_handler = logging.FileHandler(os.path.join(config.basedir, "garmin_downloader.log"))
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+        logging.getLogger().addHandler(file_handler)
+
         # Run download at least once at startup
         rundownloader(config)
 
@@ -71,7 +76,7 @@ def main():
                 try:
                     rundownloader(config)
                 except Exception as e:
-                    print(f"Fehler im Download-Zyklus: {e}")
+                    logger.exception(f"Error in download cycle: {e}")
 
     except Exception as e:
         logger.error(f"Error: {e}")
