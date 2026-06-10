@@ -13,6 +13,7 @@ def download_activities(garmin_service, db, config):
 
     total_downloaded = 0
     new_activities = 0
+    new_files = 0
     while total_downloaded < config.limit_activities:
         blocksize = min(config.max_activities_to_download, config.limit_activities - total_downloaded)
         if blocksize <= 0:
@@ -21,7 +22,7 @@ def download_activities(garmin_service, db, config):
         if len(activities) == 0:
             break
         for activity in activities:
-            activity['activityName'] = activity.get('activityName') or 'Unnamed Activity'            
+            activity['activityName'] = activity.get('activityName') or 'Unnamed Activity'
             already_downloaded = True
             if config.download_format in ["fit", "both"]:
                 already_downloaded = already_downloaded and db.is_activity_saved(activity['activityId'], "fit")
@@ -34,9 +35,12 @@ def download_activities(garmin_service, db, config):
 
             activity_package = download_activity_by_id(garmin_service, activity['activityId'], config)
             if activity_package:
-                new_activities += write_activity_package_to_file(activity, activity_package, db, config)
+                files_saved = write_activity_package_to_file(activity, activity_package, db, config)
+                if files_saved > 0:
+                    new_activities += 1
+                new_files += files_saved
         total_downloaded += len(activities)
-    logger.info(f"Download finished, new activities downloaded {new_activities}")    
+    logger.info(f"Download finished: {new_activities} new activities, {new_files} new files")    
 
 def download_activity_by_id(garmin_service, activity_id, config):    
     activites_package = {}

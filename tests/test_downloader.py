@@ -1,4 +1,5 @@
 import io
+import logging
 import zipfile
 from downloader import download_activities, download_activity_by_id, write_activity_package_to_file
 from unittest.mock import MagicMock, call
@@ -92,6 +93,87 @@ def test_write_activity_package_to_file_success(mock_config, tmp_path):
     
     expected_path = tmp_path / "running" / "2026-06-01_Morning Run.fit"
     assert expected_path.exists()
+
+def test_download_activities_counts_files_and_activities(mock_config, mocker, caplog):
+    """With DOWNLOAD_FORMAT=both, one new activity produces 2 files.
+    new_activities must stay 1 while new_files becomes 2."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 1
+    mock_config.download_format = "both"
+
+    activity = {
+        'activityId': '789',
+        'activityName': 'Long Ride',
+        'startTimeLocal': '2026-06-03 10:00:00'
+    }
+    garmin_service.get_activities.return_value = [activity]
+    db.is_activity_saved.return_value = False
+
+    mocker.patch('downloader.download_activity_by_id', return_value={"fit": b"fit-data", "tcx": b"tcx-data"})
+    mocker.patch('downloader.write_activity_package_to_file', return_value=2)
+
+    with caplog.at_level(logging.INFO, logger="downloader"):
+        download_activities(garmin_service, db, mock_config)
+
+    assert "1 new activities" in caplog.text
+    assert "2 new files" in caplog.text
+
+
+def test_download_activities_no_count_on_write_failure(mock_config, mocker, caplog):
+    """If write_activity_package_to_file returns 0 (all writes failed),
+    neither new_activities nor new_files should be incremented."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 1
+    mock_config.download_format = "fit"
+
+    activity = {
+        'activityId': '321',
+        'activityName': 'Failed Run',
+        'startTimeLocal': '2026-06-04 06:00:00'
+    }
+    garmin_service.get_activities.return_value = [activity]
+    db.is_activity_saved.return_value = False
+
+    mocker.patch('downloader.download_activity_by_id', return_value={"fit": b"data"})
+    mocker.patch('downloader.write_activity_package_to_file', return_value=0)
+
+    with caplog.at_level(logging.INFO, logger="downloader"):
+        download_activities(garmin_service, db, mock_config)
+
+    assert "0 new activities" in caplog.text
+    assert "0 new files" in caplog.text
+
+
+def test_download_activities_mixed_new_and_existing(mock_config, mocker, caplog):
+    """3 activities fetched: 2 already in DB, 1 new.
+    new_activities must be 1, new_files must be 1."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 3
+    mock_config.download_format = "fit"
+
+    activities = [
+        {'activityId': '1', 'activityName': 'Run A', 'startTimeLocal': '2026-06-01 07:00:00'},
+        {'activityId': '2', 'activityName': 'Run B', 'startTimeLocal': '2026-06-02 07:00:00'},
+        {'activityId': '3', 'activityName': 'Run C', 'startTimeLocal': '2026-06-03 07:00:00'},
+    ]
+    garmin_service.get_activities.return_value = activities
+    db.is_activity_saved.side_effect = lambda aid, _: aid in ('1', '2')
+
+    mocker.patch('downloader.download_activity_by_id', return_value={"fit": b"data"})
+    mocker.patch('downloader.write_activity_package_to_file', return_value=1)
+
+    with caplog.at_level(logging.INFO, logger="downloader"):
+        download_activities(garmin_service, db, mock_config)
+
+    assert "1 new activities" in caplog.text
+    assert "1 new files" in caplog.text
+
 
 def test_download_activity_zip_handling(mock_config):
     """Tests if .fit files are correctly extracted from a Garmin API ZIP response."""
