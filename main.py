@@ -63,7 +63,6 @@ def main():
             datefmt="%Y-%m-%d %H:%M:%S",
             handlers=[console_handler]
             )
-        logger.info(f"Garmin Downloader v{__version__} starting")
         config, errors = GarminDownloaderConfig.from_env()
         if not config:
             logger.error("Invalid configuration:")
@@ -76,6 +75,9 @@ def main():
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
         logging.getLogger().addHandler(file_handler)
+
+        # Logged after the file handler is attached so the version ends up in the persistent log too
+        logger.info(f"Garmin Downloader v{__version__} starting")
 
         # Run download at least once at startup
         rundownloader(config)
