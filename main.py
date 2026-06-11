@@ -7,6 +7,7 @@ from garminservice import GarminService
 from config import GarminDownloaderConfig
 from downloader import download_activities
 from migration import migrate_filename_template, migrate_file_structure
+from _version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ def main():
             datefmt="%Y-%m-%d %H:%M:%S",
             handlers=[console_handler]
             )
+        logger.info(f"Garmin Downloader v{__version__} starting")
         config, errors = GarminDownloaderConfig.from_env()
         if not config:
             logger.error("Invalid configuration:")

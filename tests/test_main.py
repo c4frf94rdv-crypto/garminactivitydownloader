@@ -1,8 +1,31 @@
 import logging
+import re
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 from config import GarminDownloaderConfig
 from main import main, _next_scheduled_run, _wait_until_next_run, init_download_dir, rundownloader
+import _version
+
+
+def test_version_is_semver():
+    """_version.__version__ must follow the semver MAJOR.MINOR.PATCH pattern."""
+    assert re.fullmatch(r"\d+\.\d+\.\d+", _version.__version__), (
+        f"__version__ {_version.__version__!r} is not a valid semver string"
+    )
+
+
+def test_main_logs_version_on_startup(mock_config, tmp_path, mocker, caplog):
+    """The version string must be logged at INFO level when main() starts."""
+    mock_config.dockermode = False
+    mock_config.basedir = str(tmp_path)
+
+    mocker.patch.object(GarminDownloaderConfig, "from_env", return_value=(mock_config, []))
+    mocker.patch("main.rundownloader")
+
+    with caplog.at_level(logging.INFO, logger="main"):
+        main()
+
+    assert _version.__version__ in caplog.text
 
 
 def test_next_scheduled_run_same_day():
