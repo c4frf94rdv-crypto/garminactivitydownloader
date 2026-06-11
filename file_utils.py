@@ -53,7 +53,10 @@ def get_downloadpath_by_activitytype(activity, filetype, config):
             download_dir = os.path.join(download_dir, "tcx")
 
     if config.subfolder_per_activitytype:
-        activity_type = resolve_activity_type_key(activity, config)
+        # The type key comes from the Garmin API response: sanitize it so unexpected values cannot create folders outside the download directory
+        activity_type = sanitize_filename(resolve_activity_type_key(activity, config))
+        if activity_type.strip(". ") == "":
+            activity_type = "unknown"
         download_dir = os.path.join(download_dir, activity_type)
     os.makedirs(download_dir, exist_ok=True)
     return download_dir

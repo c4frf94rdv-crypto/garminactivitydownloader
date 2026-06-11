@@ -39,6 +39,36 @@ def test_build_unique_filepath_suffixes_when_file_known_to_db(mock_config, tmp_p
 
     assert path == str(tmp_path / "999_1.fit")
 
+def test_get_downloadpath_sanitizes_activity_type(mock_config, tmp_path):
+    """A malicious or malformed typeKey from the API must not create folders outside the download directory."""
+    mock_config.basedir = str(tmp_path)
+    mock_config.download_dir = "activities"
+    mock_config.subfolder_per_format = False
+    mock_config.subfolder_per_activitytype = True
+    mock_config.use_parent_activity_type = False
+
+    base = os.path.realpath(os.path.join(str(tmp_path), "activities"))
+
+    activity = {"activityType": {"typeKey": "../../../etc"}}
+    path = os.path.realpath(get_downloadpath_by_activitytype(activity, "fit", mock_config))
+
+    assert path.startswith(base + os.sep)
+
+
+def test_get_downloadpath_dot_only_activity_type_becomes_unknown(mock_config, tmp_path):
+    """Type keys that sanitize to dots only (e.g. '..') must be replaced with 'unknown' instead of escaping the directory."""
+    mock_config.basedir = str(tmp_path)
+    mock_config.download_dir = "activities"
+    mock_config.subfolder_per_format = False
+    mock_config.subfolder_per_activitytype = True
+    mock_config.use_parent_activity_type = False
+
+    activity = {"activityType": {"typeKey": ".."}}
+    path = get_downloadpath_by_activitytype(activity, "fit", mock_config)
+
+    assert os.path.basename(path) == "unknown"
+
+
 def test_safe_dict_missing_key():
     """Verify SafeDict returns {key} for missing keys."""
     d = SafeDict({"a": 1})
