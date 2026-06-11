@@ -49,7 +49,8 @@ def _wait_until_next_run(config) -> None:
     else:
         next_run = now + timedelta(seconds=config.downloadinterval)
     logger.info(f"Next download scheduled at: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-    time.sleep((next_run - datetime.now()).total_seconds())
+    # Clamp to 0: time.sleep raises ValueError for negative values, which can occur if next_run has already passed by the time we get here
+    time.sleep(max(0.0, (next_run - datetime.now()).total_seconds()))
 
 def main():
     try:
@@ -79,8 +80,8 @@ def main():
 
         if config.dockermode:
             while True:
-                _wait_until_next_run(config)
                 try:
+                    _wait_until_next_run(config)
                     rundownloader(config)
                 except Exception as e:
                     logger.exception(f"Error in download cycle: {e}")

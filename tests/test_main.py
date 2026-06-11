@@ -66,6 +66,24 @@ def test_wait_until_next_run_without_schedule_time(mock_config, mocker, caplog):
     assert 3590 <= sleep_seconds <= 3600
 
 
+def test_wait_until_next_run_clamps_negative_sleep(mock_config, mocker):
+    """If next_run has already passed by the time sleep is called, the duration must be clamped to 0 instead of raising ValueError."""
+    mock_config.schedule_time = None
+    mock_config.downloadinterval = 1
+
+    # First now() computes next_run, second now() is already past it
+    mock_datetime = mocker.patch("main.datetime")
+    mock_datetime.now.side_effect = [
+        datetime(2026, 6, 10, 12, 0, 0),
+        datetime(2026, 6, 10, 12, 0, 5),
+    ]
+    mock_sleep = mocker.patch("main.time.sleep")
+
+    _wait_until_next_run(mock_config)
+
+    mock_sleep.assert_called_once_with(0.0)
+
+
 def test_wait_until_next_run_with_schedule_time(mock_config, mocker, caplog):
     """With SCHEDULE_TIME the logged next run matches the schedule anchor."""
     mock_config.schedule_time = "18:00"
