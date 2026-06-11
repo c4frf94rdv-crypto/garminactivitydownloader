@@ -56,6 +56,9 @@ class GarminDownloaderDB:
         existing_columns = [row[1] for row in cursor.fetchall()]
 
         # dynamicaly add columns if they dont exist
+        # SECURITY: col_name/col_type are interpolated into the SQL statement (ALTER TABLE does not support
+        # parameters for identifiers). They MUST only ever come from the hardcoded dict above — never from
+        # user input, the database itself, or API responses.
         for col_name, col_type in required_columns.items():
             if col_name not in existing_columns:
                 logger.debug(f"Adding missing column '{col_name}' to activities table.")
