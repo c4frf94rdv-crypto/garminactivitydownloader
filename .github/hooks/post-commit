@@ -22,3 +22,5 @@ fi
 
 git tag "$TAG"
 echo "post-commit: created tag $TAG"
+git push origin "$TAG"
+echo "post-commit: pushed tag $TAG to origin"
