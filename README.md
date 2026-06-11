@@ -1,4 +1,4 @@
-# Garmin Activity Downloader
+# Garmin Activity Downloader ![version](https://img.shields.io/badge/version-1.0.1-blue)
 
 Automatically downloads activity files from Garmin Connect and saves them locally. Supports FIT and TCX formats, configurable folder structures, and runs continuously in Docker with a scheduled download interval.
 
