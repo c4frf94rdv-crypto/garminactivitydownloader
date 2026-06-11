@@ -22,10 +22,13 @@ def download_activities(garmin_service, db, config):
         for activity in activities:
             activity['activityName'] = activity.get('activityName') or 'Unnamed Activity'
             already_downloaded = True
+            # A saved gpx file also counts as fit/tcx: gpx is the fallback for activities where those formats are not available, so re-downloading them would never yield the requested format anyway
             if config.download_format in ["fit", "both"]:
-                already_downloaded = already_downloaded and db.is_activity_saved(activity['activityId'], "fit")
+                already_downloaded = already_downloaded and (db.is_activity_saved(activity['activityId'], "fit")
+                                                             or db.is_activity_saved(activity['activityId'], "gpx"))
             if config.download_format in ["tcx", "both"]:
-                already_downloaded = already_downloaded and db.is_activity_saved(activity['activityId'], "tcx")
+                already_downloaded = already_downloaded and (db.is_activity_saved(activity['activityId'], "tcx")
+                                                             or db.is_activity_saved(activity['activityId'], "gpx"))
 
             if already_downloaded:
                 logger.debug(f" - {activity['activityName']} / {config.download_format} at {activity['startTimeLocal']} already downloaded, skipping.")
@@ -74,10 +77,38 @@ def download_activity_by_id(garmin_service, activity_id, config):
             return None
     if config.download_format in ["tcx", "both"]:
         try:
-            activites_package["tcx"] = garmin_service.download_activity(activity_id, Garmin.ActivityDownloadFormat.TCX)
+            tcx_data = garmin_service.download_activity(activity_id, Garmin.ActivityDownloadFormat.TCX)
+            if tcx_data:
+                activites_package["tcx"] = tcx_data
+            else:
+                # No TCX data available for this activity (e.g. manually created), fall back to GPX
+                logger.info(f"Activity {activity_id}: No TCX data available, falling back to GPX.")
+                _add_gpx_fallback(garmin_service, activity_id, activites_package)
         except GarminConnectConnectionError as e:
+            # Transient error: no GPX fallback so the TCX download is retried on the next run
             logger.error(f"Activity {activity_id}: TCX download failed, skipping!")
     return activites_package
+
+def _add_gpx_fallback(garmin_service, activity_id, activites_package):
+    """Downloads the ORIGINAL format and adds a contained .gpx file to the package, unless one is already present."""
+    if "gpx" in activites_package:
+        return
+    try:
+        raw_bytes = garmin_service.download_activity(activity_id, Garmin.ActivityDownloadFormat.ORIGINAL)
+    except GarminConnectConnectionError:
+        logger.error(f"Activity {activity_id}: GPX fallback download failed, skipping!")
+        return
+    if raw_bytes and raw_bytes.startswith(b'PK\x03\x04'):
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw_bytes)) as z:
+                gpx_file = next((f for f in z.namelist() if f.lower().endswith('.gpx')), None)
+                if gpx_file:
+                    activites_package["gpx"] = z.read(gpx_file)
+                    return
+        except zipfile.BadZipFile:
+            logger.error(f"Activity {activity_id}: Invalid ZIP file from Garmin API")
+            return
+    logger.warning(f"Activity {activity_id}: No .gpx file available as fallback.")
 
 def write_activity_package_to_file(activity, activites_package, db, config) -> int:
     saved = 0;

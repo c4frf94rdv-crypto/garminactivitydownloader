@@ -28,6 +28,28 @@ def test_download_activities_skips_existing(mock_config, mocker):
     mock_download_by_id.assert_not_called()
 
 
+def test_download_activities_skips_when_gpx_fallback_saved(mock_config, mocker):
+    """An activity saved as gpx (fallback for missing fit) must count as downloaded for format 'fit' and not be downloaded again."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 1
+    mock_config.download_format = "fit"
+
+    activity = {
+        'activityId': '123',
+        'activityName': 'Old Hike',
+        'startTimeLocal': '2026-06-01 08:00:00'
+    }
+    garmin_service.get_activities.return_value = [activity]
+    db.is_activity_saved.side_effect = lambda aid, filetype: filetype == "gpx"
+
+    mock_download_by_id = mocker.patch('downloader.download_activity_by_id')
+    download_activities(garmin_service, db, mock_config)
+
+    mock_download_by_id.assert_not_called()
+
+
 def test_download_activities_downloads_new(mock_config, mocker):
     """Tests that new activities are downloaded and written if not in DB."""
     garmin_service = MagicMock()
@@ -263,6 +285,96 @@ def test_download_activity_tcx_connection_error_logs_and_continues(mock_config, 
 
     assert "TCX download failed" in caplog.text
     assert package == {}
+
+
+def test_download_activity_tcx_empty_falls_back_to_gpx(mock_config):
+    """If the TCX download returns no data, the GPX file from the ORIGINAL format is used as fallback."""
+    garmin_service = MagicMock()
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a") as zf:
+        zf.writestr("track.gpx", b"gpx-content")
+    original_zip = zip_buffer.getvalue()
+
+    def fake_download(activity_id, dl_fmt):
+        from garminconnect import Garmin
+        if dl_fmt == Garmin.ActivityDownloadFormat.TCX:
+            return b""
+        return original_zip
+
+    garmin_service.download_activity.side_effect = fake_download
+    mock_config.download_format = "tcx"
+
+    package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert package == {"gpx": b"gpx-content"}
+
+
+def test_download_activity_tcx_empty_no_gpx_available_logs_warning(mock_config, caplog):
+    """If neither TCX nor a GPX fallback is available, a warning is logged and the package stays empty."""
+    garmin_service = MagicMock()
+
+    def fake_download(activity_id, dl_fmt):
+        from garminconnect import Garmin
+        if dl_fmt == Garmin.ActivityDownloadFormat.TCX:
+            return b""
+        return b"not-a-zip"
+
+    garmin_service.download_activity.side_effect = fake_download
+    mock_config.download_format = "tcx"
+
+    with caplog.at_level(logging.WARNING, logger="downloader"):
+        package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert package == {}
+    assert "No .gpx file available as fallback" in caplog.text
+
+
+def test_download_activity_both_reuses_gpx_from_fit_fallback(mock_config):
+    """With format 'both', a gpx already obtained via the FIT fallback must not trigger a second ORIGINAL download."""
+    garmin_service = MagicMock()
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a") as zf:
+        zf.writestr("track.gpx", b"gpx-content")
+    original_zip = zip_buffer.getvalue()
+
+    def fake_download(activity_id, dl_fmt):
+        from garminconnect import Garmin
+        if dl_fmt == Garmin.ActivityDownloadFormat.TCX:
+            return b""
+        return original_zip
+
+    garmin_service.download_activity.side_effect = fake_download
+    mock_config.download_format = "both"
+
+    package = download_activity_by_id(garmin_service, "123", mock_config)
+
+    assert package == {"gpx": b"gpx-content"}
+    # Exactly one ORIGINAL and one TCX download, no extra fallback request
+    assert garmin_service.download_activity.call_count == 2
+
+
+def test_download_activities_tcx_skips_when_gpx_fallback_saved(mock_config, mocker):
+    """An activity saved as gpx must count as downloaded for format 'tcx' and not be downloaded again."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 1
+    mock_config.download_format = "tcx"
+
+    activity = {
+        'activityId': '123',
+        'activityName': 'Old Hike',
+        'startTimeLocal': '2026-06-01 08:00:00'
+    }
+    garmin_service.get_activities.return_value = [activity]
+    db.is_activity_saved.side_effect = lambda aid, filetype: filetype == "gpx"
+
+    mock_download_by_id = mocker.patch('downloader.download_activity_by_id')
+    download_activities(garmin_service, db, mock_config)
+
+    mock_download_by_id.assert_not_called()
 
 
 def test_download_activities_stops_when_api_returns_empty(mock_config):

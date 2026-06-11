@@ -79,6 +79,8 @@ Both are optional. If not set, the program prompts for login via the browser ter
 | `LIMIT_ACTIVITIES` | `5` | Number of most recent activities to download per run |
 | `DOWNLOAD_FORMAT` | `fit` | File format: `fit`, `tcx`, or `both` |
 
+> **GPX fallback:** Some activities (e.g. manually created or imported ones) have no FIT or TCX file available via the Garmin API. In that case the program falls back to the GPX file for these activities — for both the `fit` and the `tcx` format — and saves it with a `.gpx` extension (stored alongside the FIT files, also when `SUBFOLDER_PER_FORMAT` is enabled). Such activities are tracked as downloaded and are not fetched again on subsequent runs. Transient errors (e.g. network problems) do not trigger the fallback; those downloads are retried on the next run.
+
 ### Filename Template
 
 Controls how downloaded files are named.
