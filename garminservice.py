@@ -48,7 +48,8 @@ class GarminService:
             except Exception as e:
                 self._handle_login_error(e)
             
-        # If token-based login fails and we're not in Docker, try interactive login as a last resort
+        # If neither tokens nor stored credentials worked, try interactive login as a last resort
+        # (in Docker this runs through the browser terminal on port 9000, which also handles MFA)
         self.interactive_login()
         logger.info("Successfully logged in to Garmin Connect.")
 

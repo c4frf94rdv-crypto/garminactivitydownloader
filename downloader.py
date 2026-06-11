@@ -76,7 +76,7 @@ def download_activity_by_id(garmin_service, activity_id, config):
                         if fit_file:
                             activites_package["fit"] = z.read(fit_file)               
                         else:
-                            # fallback: if no .fit file is found, try to find a .gpx file in the zip and use it as fit data, this is not ideal but better than nothing and allows to still download the activity data for activities that don't have a .fit file available via the API
+                            # fallback: if no .fit file is found, store a .gpx file from the zip instead. This is not ideal but better than nothing and allows downloading activity data for activities that don't have a .fit file available via the API
                             gpx_file = next((f for f in z.namelist() if f.lower().endswith('.gpx')), None)
                             if gpx_file:
                                 activites_package["gpx"] = z.read(gpx_file)
