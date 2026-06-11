@@ -133,7 +133,7 @@ def write_activity_package_to_file(activity, activites_package, db, config) -> i
             continue
         try:    
             download_dir = get_downloadpath_by_activitytype(activity, filetype, config)
-            file_path = build_unique_filepath(activity, download_dir, filetype, config)
+            file_path = build_unique_filepath(activity, download_dir, filetype, config, db)
             try:
                 with open(file_path, "wb") as f:
                     f.write(data)

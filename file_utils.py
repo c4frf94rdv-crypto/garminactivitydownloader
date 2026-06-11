@@ -109,9 +109,21 @@ def ensure_unique_filename(download_dir, filename):
             counter += 1
 
 
-def build_unique_filepath(activity, directory, filetype, config):
-    filename = ensure_unique_filename(directory, generate_filename(activity, filetype, config))
+def build_unique_filepath(activity, directory, filetype, config, db):
+    filename = generate_filename(activity, filetype, config)
+    path = os.path.join(directory, filename)
+    if os.path.exists(path) and not _is_file_known_to_db(path, config, db):
+        # Leftover from a run that crashed between writing the file and inserting the database entry:
+        # reuse the orphaned file instead of creating a _1 duplicate; the fresh download overwrites the (possibly partial) content
+        logger.info(f"Reusing orphaned file from a previous interrupted run: {path}")
+        return path
+    filename = ensure_unique_filename(directory, filename)
     return os.path.join(directory, filename)
+
+
+def _is_file_known_to_db(path, config, db) -> bool:
+    relative_path = os.path.relpath(path, os.path.join(config.basedir, config.download_dir)).replace(os.sep, "/")
+    return db.is_file_path_saved(relative_path)
 
 
 def remove_empty_folders(path_to_check):

@@ -1,7 +1,43 @@
 import os
 from pathlib import Path
 import pytest
-from file_utils import SafeDict, ensure_unique_filename, get_downloadpath_by_activitytype, generate_filename, resolve_activity_type_key
+from unittest.mock import MagicMock
+from file_utils import SafeDict, build_unique_filepath, ensure_unique_filename, get_downloadpath_by_activitytype, generate_filename, resolve_activity_type_key
+
+
+def test_build_unique_filepath_reuses_orphaned_file(mock_config, tmp_path):
+    """A file on disk that no database entry references (leftover from a crashed run) must be reused instead of creating a _1 duplicate."""
+    db = MagicMock()
+    db.is_file_path_saved.return_value = False
+    mock_config.basedir = str(tmp_path)
+    mock_config.download_dir = ""
+    mock_config.filename_template = "{activityId}"
+
+    orphan = tmp_path / "999.fit"
+    orphan.write_bytes(b"partial data from crashed run")
+
+    activity = {"activityId": "999", "activityName": "Run", "startTimeLocal": "2026-06-01 08:00:00"}
+    path = build_unique_filepath(activity, str(tmp_path), "fit", mock_config, db)
+
+    assert path == str(orphan)
+    db.is_file_path_saved.assert_called_once_with("999.fit")
+    assert not (tmp_path / "999_1.fit").exists()
+
+
+def test_build_unique_filepath_suffixes_when_file_known_to_db(mock_config, tmp_path):
+    """A file on disk that IS referenced in the database belongs to another activity and must not be reused."""
+    db = MagicMock()
+    db.is_file_path_saved.return_value = True
+    mock_config.basedir = str(tmp_path)
+    mock_config.download_dir = ""
+    mock_config.filename_template = "{activityId}"
+
+    (tmp_path / "999.fit").write_bytes(b"data of another activity")
+
+    activity = {"activityId": "999", "activityName": "Run", "startTimeLocal": "2026-06-01 08:00:00"}
+    path = build_unique_filepath(activity, str(tmp_path), "fit", mock_config, db)
+
+    assert path == str(tmp_path / "999_1.fit")
 
 def test_safe_dict_missing_key():
     """Verify SafeDict returns {key} for missing keys."""

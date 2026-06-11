@@ -53,6 +53,14 @@ def test_save_same_id_different_filetype(db):
     assert cursor.fetchone()[0] == 2
 
 
+def test_is_file_path_saved(db):
+    """is_file_path_saved must return True only for file paths referenced by an entry."""
+    db.save_activity_to_db("12345", "fit", "Morning Run", "2026-05-31", "fit/run.fit", "running", 1, 0)
+
+    assert db.is_file_path_saved("fit/run.fit") is True
+    assert db.is_file_path_saved("fit/other.fit") is False
+
+
 def test_get_all_activities(db):
     """get_all_activities must return all stored entries."""
     db.save_activity_to_db("1", "fit", "A1", "2026", "p1", "running", 1, 0)

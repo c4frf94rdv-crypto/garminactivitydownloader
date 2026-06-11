@@ -97,6 +97,16 @@ class GarminDownloaderDB:
         result = cursor.fetchone()
         return result is not None
 
+    def is_file_path_saved(self, file_path):
+        """
+        Checks if any activity in the database references the given relative file path.
+        :param file_path: The relative file path to check ("/"-separated, as stored in the database).
+        :return: True if an entry references the path, False otherwise.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT 1 FROM activities WHERE file_path = ?', (file_path,))
+        return cursor.fetchone() is not None
+
     def cleanup_orphaned_entries(self):
         """
         Cleans up database entries that reference files that no longer exist or are duplicates.
