@@ -158,10 +158,13 @@ The included `docker-compose.yml` sets up the container with a volume mount so a
 
 ```
 data/
-├── .garmin_tokens/     # Saved login tokens
-├── garmin_activities/  # Downloaded activity files
+├── .garmin_tokens/                   # Saved login tokens
+├── garmin_activities/                # Downloaded activity files (DOWNLOAD_DIR)
+│   └── garmin_activities.db          # Database tracking downloads (DB_FILE)
 └── garmin_downloader.log
 ```
+
+The database keeps track of which activities have already been downloaded, so re-running the tool only fetches new activities.
 
 ### Scheduling
 
