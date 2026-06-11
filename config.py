@@ -1,6 +1,35 @@
 from dataclasses import dataclass, field
+import logging
 import os
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
+
+# Downloading more often than this risks running into the Garmin Connect rate limits
+RECOMMENDED_MIN_DOWNLOADINTERVAL = 3600
+
+
+def _getenv(name, default=None):
+    """Returns the environment variable or the default if it is unset, empty, or whitespace-only.
+
+    Unlike os.getenv, an empty value (e.g. "BASEDIR=" in the .env file) falls back to the default
+    instead of returning an empty string.
+    """
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip()
+
+
+def _getenv_bool(name, default):
+    """Reads a boolean environment variable; invalid values log a warning and fall back to the default."""
+    raw = _getenv(name)
+    if raw is None:
+        return default
+    if raw.lower() in ("true", "false"):
+        return raw.lower() == "true"
+    logger.warning(f"{name} must be 'true' or 'false', got '{raw}'. Using default '{str(default).lower()}'.")
+    return default
 
 @dataclass
 class GarminDownloaderConfig:
@@ -50,15 +79,15 @@ class GarminDownloaderConfig:
         load_dotenv()
         errors = []
 
-        download_dir = os.getenv("DOWNLOAD_DIR")
+        download_dir = _getenv("DOWNLOAD_DIR")
         if not download_dir:
             errors.append("DOWNLOAD_DIR is required")
 
-        download_format = os.getenv("DOWNLOAD_FORMAT", "fit").lower()
+        download_format = _getenv("DOWNLOAD_FORMAT", "fit").lower()
         if download_format not in ["fit", "tcx", "both"]:
             errors.append(f"DOWNLOAD_FORMAT must be 'fit', 'tcx', or 'both', got '{download_format}'")
 
-        limit_activities_str = os.getenv("LIMIT_ACTIVITIES", "5")
+        limit_activities_str = _getenv("LIMIT_ACTIVITIES", "5")
         limit_activities = 5
         try:
             limit_activities = int(limit_activities_str)
@@ -68,17 +97,20 @@ class GarminDownloaderConfig:
         except ValueError:
             errors.append(f"LIMIT_ACTIVITIES must be an integer, got '{limit_activities_str}'")
 
-        downloadinterval_str = os.getenv("DOWNLOADINTERVAL", "86400")
+        downloadinterval_str = _getenv("DOWNLOADINTERVAL", "86400")
         downloadinterval = 86400
         try:
             downloadinterval = int(downloadinterval_str)
             if downloadinterval < 1:
                 errors.append(f"DOWNLOADINTERVAL must be >= 1, got {downloadinterval}")
                 downloadinterval = 86400
+            elif downloadinterval < RECOMMENDED_MIN_DOWNLOADINTERVAL:
+                logger.warning(f"DOWNLOADINTERVAL is set to {downloadinterval} seconds. "
+                               f"Garmin Connect enforces rate limits — intervals below {RECOMMENDED_MIN_DOWNLOADINTERVAL} seconds are not recommended.")
         except ValueError:
             errors.append(f"DOWNLOADINTERVAL must be an integer, got '{downloadinterval_str}'")
 
-        schedule_time_str = os.getenv("SCHEDULE_TIME", "").strip()
+        schedule_time_str = _getenv("SCHEDULE_TIME", "")
         schedule_time = None
         if schedule_time_str:
             try:
@@ -96,20 +128,20 @@ class GarminDownloaderConfig:
             return None, errors
 
         return cls(
-            user_email=os.getenv("USER_EMAIL"),
-            user_password=os.getenv("USER_PASSWORD"),
+            user_email=_getenv("USER_EMAIL"),
+            user_password=_getenv("USER_PASSWORD"),
             download_dir=download_dir,
-            db_file=os.getenv("DB_FILE", "garmin_activities.db"),
+            db_file=_getenv("DB_FILE", "garmin_activities.db"),
             limit_activities=limit_activities,
-            subfolder_per_activitytype=os.getenv("SUBFOLDER_PER_ACTIVITYTYPE", "true").lower() == "true",
-            filename_template=os.getenv("FILENAME_TEMPLATE", "{activityId}"),
-            rename_existing_files=os.getenv("RENAME_EXISTING_FILES", "false").lower() == "true",
+            subfolder_per_activitytype=_getenv_bool("SUBFOLDER_PER_ACTIVITYTYPE", True),
+            filename_template=_getenv("FILENAME_TEMPLATE", "{activityId}"),
+            rename_existing_files=_getenv_bool("RENAME_EXISTING_FILES", False),
             download_format=download_format,
-            subfolder_per_format=os.getenv("SUBFOLDER_PER_FORMAT", "false").lower() == "true",
-            reorder_existing_filestructure=os.getenv("REORDER_EXISTING_FILESTRUCTURE", "false").lower() == "true",
-            use_parent_activity_type=os.getenv("USE_PARENT_ACTIVITY_TYPE", "false").lower() == "true",
-            dockermode=os.getenv("DOCKERMODE", "true").lower() == "true",
+            subfolder_per_format=_getenv_bool("SUBFOLDER_PER_FORMAT", False),
+            reorder_existing_filestructure=_getenv_bool("REORDER_EXISTING_FILESTRUCTURE", False),
+            use_parent_activity_type=_getenv_bool("USE_PARENT_ACTIVITY_TYPE", False),
+            dockermode=_getenv_bool("DOCKERMODE", True),
             downloadinterval=downloadinterval,
             schedule_time=schedule_time,
-            basedir=os.getenv("BASEDIR", os.path.join(os.getcwd(), "data"))
+            basedir=_getenv("BASEDIR", os.path.join(os.getcwd(), "data"))
         ),[]

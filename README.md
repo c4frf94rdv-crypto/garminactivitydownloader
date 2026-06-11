@@ -55,6 +55,8 @@ Set `DOCKERMODE=false` in `.env` to run only once instead of continuously.
 
 All settings are controlled via environment variables in the `.env` file.
 
+Variables that are left empty (e.g. `BASEDIR=`) are treated as unset and fall back to their defaults. Boolean variables accept `true` or `false` (case-insensitive); any other value logs a warning and falls back to the default.
+
 ### Credentials
 
 | Variable | Description |
@@ -99,7 +101,9 @@ Available placeholders:
 | `{activityStartDate}` | `2026-06-10` |
 | `{activityStartDateTime}` | `2026-06-10_08-30-00` |
 
-Example: `FILENAME_TEMPLATE="{activityStartDateTime}_{activityName}"` produces `2026-06-10_08-30-00_Morning Run.fit`.
+Example: `FILENAME_TEMPLATE={activityStartDateTime}_{activityName}` produces `2026-06-10_08-30-00_Morning Run.fit`.
+
+Do not put quotes around the value — when the `.env` file is read by Docker's `env_file`, quotes are treated as part of the template.
 
 ### Folder Structure
 
@@ -180,7 +184,7 @@ Examples:
 | Every 6 hours starting at 10:00 | `SCHEDULE_TIME=10:00` + `DOWNLOADINTERVAL=21600` |
 | Weekly (same weekday, 10:00) | `SCHEDULE_TIME=10:00` + `DOWNLOADINTERVAL=604800` |
 
-> **Note:** Garmin Connect enforces rate limits. Avoid setting `DOWNLOADINTERVAL` below a few hours.
+> **Note:** Garmin Connect enforces rate limits. Avoid setting `DOWNLOADINTERVAL` below a few hours; values below 3600 seconds are accepted but produce a warning in the log.
 
 ### Browser Terminal
 

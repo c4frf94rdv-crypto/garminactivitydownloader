@@ -249,18 +249,57 @@ def test_config_schedule_time_not_set_defaults_to_none(clean_env):
     assert config.schedule_time is None
 
 
-def test_config_boolean_fallback_on_invalid_string(clean_env):
-    """
-    Validates the behavior when a boolean field receives a string 
-    other than 'true' (case-insensitive). Based on your code, 
-    anything not 'true' results in False.
-    """
+def test_config_boolean_fallback_on_invalid_string(clean_env, caplog):
+    """A boolean field with a value other than 'true'/'false' must log a warning and fall back to its default."""
     os.environ["DOWNLOAD_DIR"] = "."
     os.environ["SUBFOLDER_PER_ACTIVITYTYPE"] = "maybe"
     os.environ["RENAME_EXISTING_FILES"] = "YesPlease"
-    
+
     config, errors = GarminDownloaderConfig.from_env()
-    
-    # According to .lower() == "true" logic:
-    assert config.subfolder_per_activitytype is False
+
+    # Defaults: SUBFOLDER_PER_ACTIVITYTYPE=true, RENAME_EXISTING_FILES=false
+    assert config.subfolder_per_activitytype is True
     assert config.rename_existing_files is False
+    assert "SUBFOLDER_PER_ACTIVITYTYPE must be 'true' or 'false', got 'maybe'" in caplog.text
+    assert "RENAME_EXISTING_FILES must be 'true' or 'false', got 'YesPlease'" in caplog.text
+
+
+def test_config_boolean_accepts_case_and_whitespace(clean_env):
+    """Boolean values with different casing or surrounding whitespace must be parsed correctly."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["SUBFOLDER_PER_FORMAT"] = " True "
+    os.environ["DOCKERMODE"] = "FALSE"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert config.subfolder_per_format is True
+    assert config.dockermode is False
+
+
+def test_config_empty_values_fall_back_to_defaults(clean_env):
+    """Variables set to an empty string (e.g. 'BASEDIR=' in .env) must fall back to their defaults instead of producing empty paths."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["BASEDIR"] = ""
+    os.environ["DB_FILE"] = "   "
+    os.environ["FILENAME_TEMPLATE"] = ""
+    os.environ["DOWNLOADINTERVAL"] = ""
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert errors == []
+    assert config.basedir == os.path.join(os.getcwd(), "data")
+    assert config.db_file == "garmin_activities.db"
+    assert config.filename_template == "{activityId}"
+    assert config.downloadinterval == 86400
+
+
+def test_config_low_downloadinterval_logs_warning(clean_env, caplog):
+    """A download interval below the recommended minimum is accepted but must log a rate limit warning."""
+    os.environ["DOWNLOAD_DIR"] = "."
+    os.environ["DOWNLOADINTERVAL"] = "60"
+
+    config, errors = GarminDownloaderConfig.from_env()
+
+    assert errors == []
+    assert config.downloadinterval == 60
+    assert "rate limits" in caplog.text
