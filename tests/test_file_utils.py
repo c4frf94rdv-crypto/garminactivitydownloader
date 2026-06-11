@@ -69,6 +69,21 @@ def test_get_downloadpath_dot_only_activity_type_becomes_unknown(mock_config, tm
     assert os.path.basename(path) == "unknown"
 
 
+def test_remove_empty_folders_logs_warning_and_terminates_on_error(mock_config, tmp_path, mocker, caplog):
+    """A folder that cannot be deleted must log a warning, and the cleanup loop must still terminate."""
+    import logging
+    from file_utils import remove_empty_folders
+
+    (tmp_path / "empty_dir").mkdir()
+    mocker.patch("file_utils.os.rmdir", side_effect=OSError("permission denied"))
+
+    with caplog.at_level(logging.WARNING, logger="file_utils"):
+        remove_empty_folders(str(tmp_path))
+
+    assert "Could not delete empty directory" in caplog.text
+    assert (tmp_path / "empty_dir").exists()
+
+
 def test_safe_dict_missing_key():
     """Verify SafeDict returns {key} for missing keys."""
     d = SafeDict({"a": 1})

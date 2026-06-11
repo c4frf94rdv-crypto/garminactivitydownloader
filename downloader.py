@@ -142,8 +142,8 @@ def write_activity_package_to_file(activity, activites_package, db, config) -> i
                 try:
                     if os.path.exists(file_path):
                         os.remove(file_path)
-                except Exception:
-                    pass
+                except OSError as cleanup_error:
+                    logger.warning(f"Could not remove incomplete file {file_path}: {cleanup_error}")
                 raise
             relative_file_path = os.path.relpath(file_path, os.path.join(config.basedir, config.download_dir)).replace(os.sep, "/")
             db.save_activity_to_db(activity['activityId'],

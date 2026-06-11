@@ -581,8 +581,9 @@ def test_write_activity_package_cleanup_failure_is_swallowed(mock_config, tmp_pa
     with patch("builtins.open", side_effect=OSError("disk full")):
         with patch("downloader.os.path.exists", return_value=True):
             with patch("downloader.os.remove", side_effect=OSError("permission denied")):
-                with caplog.at_level(logging.ERROR, logger="downloader"):
+                with caplog.at_level(logging.WARNING, logger="downloader"):
                     saved = write_activity_package_to_file(activity, {"fit": b"data"}, db, mock_config)
 
     assert saved == 0
+    assert "Could not remove incomplete file" in caplog.text
     assert "Error saving activity" in caplog.text

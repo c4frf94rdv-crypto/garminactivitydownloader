@@ -142,7 +142,7 @@ def remove_empty_folders(path_to_check):
                     os.rmdir(root)
                     logger.debug(f"Deleted empty directory {root}")
                     folders_deleted_this_run += 1
-            except Exception:
-                pass
+            except OSError as e:
+                logger.warning(f"Could not delete empty directory {root}: {e}")
         if folders_deleted_this_run == 0:
             break
