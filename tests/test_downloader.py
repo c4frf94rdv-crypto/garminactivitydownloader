@@ -2,7 +2,7 @@ import io
 import logging
 import zipfile
 from unittest.mock import MagicMock, call, patch
-from garminconnect.exceptions import GarminConnectConnectionError
+from garminconnect.exceptions import GarminConnectConnectionError, GarminConnectTooManyRequestsError
 from downloader import download_activities, download_activity_by_id, write_activity_package_to_file
 
 def test_download_activities_skips_existing(mock_config, mocker):
@@ -375,6 +375,64 @@ def test_download_activities_tcx_skips_when_gpx_fallback_saved(mock_config, mock
     download_activities(garmin_service, db, mock_config)
 
     mock_download_by_id.assert_not_called()
+
+
+def test_download_activities_continues_after_unexpected_error(mock_config, mocker, caplog):
+    """An unexpected error in one activity must be logged and must not abort the processing of the remaining activities."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 2
+    mock_config.download_format = "fit"
+
+    activities = [
+        {'activityId': '1', 'activityName': 'Broken Run', 'startTimeLocal': '2026-06-01 07:00:00'},
+        {'activityId': '2', 'activityName': 'Good Run', 'startTimeLocal': '2026-06-02 07:00:00'},
+    ]
+    garmin_service.get_activities.return_value = activities
+    db.is_activity_saved.return_value = False
+
+    mock_download_by_id = mocker.patch(
+        'downloader.download_activity_by_id',
+        side_effect=[KeyError("unexpected API response"), {"fit": b"data"}]
+    )
+    mock_writer = mocker.patch('downloader.write_activity_package_to_file', return_value=1)
+
+    with caplog.at_level(logging.ERROR, logger="downloader"):
+        download_activities(garmin_service, db, mock_config)
+
+    assert mock_download_by_id.call_count == 2
+    mock_writer.assert_called_once()
+    assert "Unexpected error, skipping this activity" in caplog.text
+
+
+def test_download_activities_aborts_on_rate_limit(mock_config, mocker, caplog):
+    """A rate limit error must abort the run without attempting further downloads."""
+    garmin_service = MagicMock()
+    db = MagicMock()
+
+    mock_config.limit_activities = 2
+    mock_config.download_format = "fit"
+
+    activities = [
+        {'activityId': '1', 'activityName': 'Run A', 'startTimeLocal': '2026-06-01 07:00:00'},
+        {'activityId': '2', 'activityName': 'Run B', 'startTimeLocal': '2026-06-02 07:00:00'},
+    ]
+    garmin_service.get_activities.return_value = activities
+    db.is_activity_saved.return_value = False
+
+    mock_download_by_id = mocker.patch(
+        'downloader.download_activity_by_id',
+        side_effect=GarminConnectTooManyRequestsError("rate limited")
+    )
+
+    with caplog.at_level(logging.INFO, logger="downloader"):
+        download_activities(garmin_service, db, mock_config)
+
+    # Only the first activity is attempted, then the run stops
+    assert mock_download_by_id.call_count == 1
+    assert "Rate limit reached" in caplog.text
+    assert "Download finished" in caplog.text
 
 
 def test_download_activities_stops_when_api_returns_empty(mock_config):
