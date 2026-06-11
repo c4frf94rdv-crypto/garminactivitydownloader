@@ -4,7 +4,11 @@ services:
     container_name: garminactivitydownloader
     restart: unless-stopped
     ports:
-      - "9000:9000"     # Browser-based terminal for interactive login and MFA
+      # Browser-based terminal for interactive login and MFA.
+      # Bound to localhost only: ttyd has no authentication and exposes a shell
+      # inside the container. For remote access use an SSH tunnel or a reverse
+      # proxy with authentication instead of exposing the port directly.
+      - "127.0.0.1:9000:9000"
     env_file:
       - .env
     volumes:

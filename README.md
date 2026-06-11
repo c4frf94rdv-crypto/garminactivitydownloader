@@ -183,3 +183,5 @@ Examples:
 ### Browser Terminal
 
 The container exposes a browser-based terminal at `http://localhost:9000`. This is used for the initial Garmin login and supports MFA. After logging in once, the session tokens are stored in the data volume and no further interaction is needed.
+
+> **Security note:** The terminal has no authentication and provides shell access inside the container. The provided `docker-compose.yml` therefore binds the port to `127.0.0.1`, so it is only reachable from the Docker host itself. If you need to log in from another machine, use an SSH tunnel (e.g. `ssh -L 9000:localhost:9000 <docker-host>`) or a reverse proxy with authentication — do not expose port 9000 directly.
